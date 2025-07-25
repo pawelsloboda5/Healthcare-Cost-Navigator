@@ -3,35 +3,43 @@
 ETL Script for Healthcare Cost Navigator
 Loads Medicare data from CSV into PostgreSQL database
 """
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
-from core.database import AsyncSessionLocal, init_db
-from models.models import Provider, DRGProcedure, ProviderProcedure, ProviderRating, CSVColumnMapping
-import random
-from typing import Optional, Tuple, Dict
-import logging
-
 import asyncio
 import pandas as pd
 import httpx
 import sys
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+import random
+from typing import Optional, Tuple, Dict
+import logging
 
-# Add the app directory to the Python path
+# Add the app directory to the Python path BEFORE importing app modules
 app_dir = Path(__file__).parent.parent / "app"
 sys.path.insert(0, str(app_dir))
+
+# Now import the app modules
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
+from core.database import AsyncSessionLocal, init_db
+from models.models import Provider, DRGProcedure, ProviderProcedure, ProviderRating, CSVColumnMapping
 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+#load env from parent directory
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
+
+MAPS_KEY = os.environ["AZURE_MAPS_KEY"]
+SEARCH_URL = f"https://atlas.microsoft.com/search/Address/json?api-version=1.0&subscription-key={MAPS_KEY}"
+
 class HealthcareETL:
-    def __init__(self, csv_file_path: str = "data/medicare-data-raw.csv"):
+    def __init__(self, csv_file_path: str = "../../data/medicare-data-raw.csv"):
         self.csv_file_path = csv_file_path
-        self.nominatim_client = httpx.AsyncClient(
-            base_url="https://nominatim.openstreetmap.org",
+        self.azure_maps_client = httpx.AsyncClient(
             timeout=15.0,
             headers={'User-Agent': 'Healthcare-Cost-Navigator/1.0'}
         )
@@ -137,7 +145,7 @@ class HealthcareETL:
         }
         
     async def geocode_address(self, address: str, city: str, state: str, zip_code: str) -> Optional[Tuple[float, float]]:
-        """Geocode a full address to get lat/lon coordinates"""
+        """Geocode a full address using Azure Maps API"""
         # Build a comprehensive address string
         address_parts = []
         if address and address.strip() and address.strip() != 'nan':
@@ -156,32 +164,33 @@ class HealthcareETL:
             return self.geocoding_cache[cache_key]
             
         try:
-            # Rate limiting - be respectful to Nominatim
-            await asyncio.sleep(1.2)
+            # Azure Maps has much higher rate limits - minimal delay
+            await asyncio.sleep(0.1)
             
-            response = await self.nominatim_client.get(
-                "/search",
+            response = await self.azure_maps_client.get(
+                SEARCH_URL,
                 params={
-                    "q": full_address,
-                    "format": "json",
+                    "query": full_address,
                     "limit": 1,
-                    "countrycodes": "us",
-                    "addressdetails": 1
+                    "countrySet": "US"
                 }
             )
             
             if response.status_code == 200:
                 data = response.json()
-                if data and len(data) > 0:
-                    lat = float(data[0]["lat"])
-                    lon = float(data[0]["lon"])
-                    coordinates = (lon, lat)  # PostGIS uses lon, lat order
-                    self.geocoding_cache[cache_key] = coordinates
-                    logger.debug(f"Geocoded {full_address} -> {coordinates}")
-                    return coordinates
+                if data.get("results") and len(data["results"]) > 0:
+                    result = data["results"][0]
+                    position = result.get("position")
+                    if position:
+                        lat = float(position["lat"])
+                        lon = float(position["lon"])
+                        coordinates = (lon, lat)  # PostGIS uses lon, lat order
+                        self.geocoding_cache[cache_key] = coordinates
+                        logger.debug(f"Geocoded {full_address} -> {coordinates}")
+                        return coordinates
                     
         except Exception as e:
-            logger.warning(f"Geocoding failed for {full_address}: {e}")
+            logger.warning(f"Azure Maps geocoding failed for {full_address}: {e}")
             
         # If full address fails, try just city, state, zip
         if address:  # Only retry if we had a street address
@@ -193,32 +202,34 @@ class HealthcareETL:
         return None
         
     async def _geocode_fallback(self, fallback_address: str, original_cache_key: str) -> Optional[Tuple[float, float]]:
-        """Fallback geocoding with just city, state, zip"""
+        """Fallback geocoding with just city, state, zip using Azure Maps"""
         try:
-            await asyncio.sleep(1.2)
+            await asyncio.sleep(0.1)
             
-            response = await self.nominatim_client.get(
-                "/search",
+            response = await self.azure_maps_client.get(
+                SEARCH_URL,
                 params={
-                    "q": fallback_address,
-                    "format": "json",
+                    "query": fallback_address,
                     "limit": 1,
-                    "countrycodes": "us"
+                    "countrySet": "US"
                 }
             )
             
             if response.status_code == 200:
                 data = response.json()
-                if data and len(data) > 0:
-                    lat = float(data[0]["lat"])
-                    lon = float(data[0]["lon"])
-                    coordinates = (lon, lat)
-                    self.geocoding_cache[original_cache_key] = coordinates
-                    logger.debug(f"Fallback geocoded {fallback_address} -> {coordinates}")
-                    return coordinates
+                if data.get("results") and len(data["results"]) > 0:
+                    result = data["results"][0]
+                    position = result.get("position")
+                    if position:
+                        lat = float(position["lat"])
+                        lon = float(position["lon"])
+                        coordinates = (lon, lat)
+                        self.geocoding_cache[original_cache_key] = coordinates
+                        logger.debug(f"Fallback geocoded {fallback_address} -> {coordinates}")
+                        return coordinates
                     
         except Exception as e:
-            logger.warning(f"Fallback geocoding failed for {fallback_address}: {e}")
+            logger.warning(f"Azure Maps fallback geocoding failed for {fallback_address}: {e}")
             
         self.geocoding_cache[original_cache_key] = None
         return None
@@ -401,7 +412,7 @@ class HealthcareETL:
                 logger.error(f"ETL process failed: {e}")
                 raise
         
-        await self.nominatim_client.aclose()
+        await self.azure_maps_client.aclose()
     
     async def load_providers(self, session: AsyncSession, df: pd.DataFrame):
         """Load unique providers with enhanced geocoding"""

@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Index, Text
 from sqlalchemy.orm import relationship
 from geoalchemy2 import Geometry
-from database import Base
+from ..core.database import Base
 
 class Provider(Base):
     __tablename__ = "providers"

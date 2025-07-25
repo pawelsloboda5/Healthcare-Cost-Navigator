@@ -6,7 +6,7 @@ services:
     container_name: healthcare_postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Your$trongPa55!
+      POSTGRES_PASSWORD: Warmia50587
       POSTGRES_DB: healthcare_cost_navigator
     ports:
       - "5432:5432"
@@ -23,7 +23,7 @@ services:
     build: .
     container_name: healthcare_api
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:Your$trongPa55!@postgres:5432/healthcare_cost_navigator
+      DATABASE_URL: postgresql+asyncpg://postgres:Warmia50587@postgres:5432/healthcare_cost_navigator
       OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
       - "8000:8000"

@@ -13,8 +13,8 @@ from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import openai
-from database import get_db, init_db
-from models import Provider, DRGProcedure, ProviderProcedure, ProviderRating
+from .core.database import get_db, init_db
+from .models.models import Provider, DRGProcedure, ProviderProcedure, ProviderRating
 import logging
 
 # Configure logging
