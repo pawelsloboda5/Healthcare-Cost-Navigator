@@ -1,5 +1,5 @@
 """
-Enhanced AI Service
+Enhanced AI Service with Structured Query Parsing
 RAG-enhanced SQL generation with template matching and safety validation
 """
 import openai
@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from ..utils.template_loader import TemplateService, ParameterMapping
 from ..utils.sql_normalizer import SQLNormalizer
 from ..utils.vector_search import TemplateMatch
+from .structured_query_parser import StructuredQueryParser, StructuredQuery, QueryType
+from .drg_lookup import drg_code_from_phrase
 
 logger = logging.getLogger(__name__)
 
@@ -24,10 +26,11 @@ class QueryResult:
     results: Optional[List[Dict]] = None
     template_used: Optional[int] = None
     confidence_score: Optional[float] = None
+    structured_params: Optional[StructuredQuery] = None
 
 class EnhancedAIService:
     """
-    Enhanced AI service with RAG, template matching, and safety validation
+    Enhanced AI service with structured parsing, RAG, template matching, and safety validation
     """
     
     def __init__(self):
@@ -38,6 +41,7 @@ class EnhancedAIService:
         self.openai_client = openai.AsyncClient(api_key=openai_api_key)
         self.template_service = TemplateService(self.openai_client)
         self.normalizer = SQLNormalizer()
+        self.structured_parser = StructuredQueryParser(self.openai_client)
         
         # Healthcare-specific context
         self.healthcare_context = """
@@ -74,7 +78,7 @@ class EnhancedAIService:
         use_template_matching: bool = True
     ) -> QueryResult:
         """
-        Process natural language query with RAG and template matching
+        Process natural language query with structured parsing and template matching
         
         Args:
             session: Database session
@@ -87,14 +91,24 @@ class EnhancedAIService:
         try:
             logger.info(f"Processing NL query: {user_query}")
             
-            # First, try template matching if enabled
+            # Step 1: Parse query into structured parameters
+            structured_params = await self.structured_parser.parse_query(user_query)
+            logger.info(f"Structured parsing result: {structured_params}")
+            
+            # Step 2: Try template matching with structured parameters
             if use_template_matching:
-                template_result = await self._try_template_matching(session, user_query)
+                template_result = await self._try_structured_template_matching(
+                    session, user_query, structured_params
+                )
                 if template_result.success:
+                    template_result.structured_params = structured_params
                     return template_result
             
-            # Fall back to RAG-enhanced generation
-            rag_result = await self._generate_with_rag(session, user_query)
+            # Step 3: Fall back to structured RAG generation
+            rag_result = await self._generate_with_structured_rag(
+                session, user_query, structured_params
+            )
+            rag_result.structured_params = structured_params
             return rag_result
             
         except Exception as e:
@@ -104,31 +118,39 @@ class EnhancedAIService:
                 message=f"Query processing failed: {str(e)}"
             )
     
-    async def _try_template_matching(
+    async def _try_structured_template_matching(
         self,
         session: AsyncSession,
-        user_query: str
+        user_query: str,
+        structured_params: StructuredQuery
     ) -> QueryResult:
-        """Try to match user query with existing templates"""
+        """Try to match user query with templates using structured parameters"""
         try:
-            # Generate initial SQL to normalize and search
-            initial_sql = await self._generate_sql_from_nl(user_query)
-            if not initial_sql:
-                return QueryResult(success=False, message="Failed to generate initial SQL")
+            # Generate SQL from structured parameters for template search
+            search_sql = await self._generate_structured_sql(structured_params)
+            if not search_sql:
+                return QueryResult(success=False, message="Failed to generate search SQL")
             
             # Search for matching templates
             template_match, normalized_sql, constants = await self.template_service.normalize_and_search(
                 session=session,
-                sql_query=initial_sql,
+                sql_query=search_sql,
                 confidence_threshold=0.7
             )
             
             if template_match:
+                # Use structured parameters to create proper constants for template
+                template_constants = await self._extract_template_constants(
+                    session, structured_params, template_match.raw_sql)
+                if not template_constants:
+                    # We couldn't supply the required parameters – fall back to RAG
+                    return QueryResult(success=False, message="Template not applicable")
+                
                 # Execute the matched template
                 success, message, results = await self.template_service.validate_and_execute_template(
                     session=session,
                     template_match=template_match,
-                    user_constants=constants
+                    user_constants=template_constants
                 )
                 
                 return QueryResult(
@@ -143,16 +165,144 @@ class EnhancedAIService:
             return QueryResult(success=False, message="No confident template match found")
             
         except Exception as e:
-            logger.error(f"Template matching failed: {e}")
+            logger.error(f"Structured template matching failed: {e}")
             return QueryResult(success=False, message="Template matching failed")
     
-    async def _generate_with_rag(
+    async def _extract_template_constants(
+        self,
+        session: AsyncSession,
+        structured_params: StructuredQuery,
+        template_sql: str
+    ) -> list[str]:
+        """
+        Return the constants to feed into template_loader.map_parameters
+        in the **exact order** they appear in the template.
+        """
+        constants: list[str] = []
+
+        tmpl = template_sql.lower()
+
+        # --- 1. procedure or DRG --------------------------------------
+        if "d.drg_code =" in tmpl:
+            # template wants a numeric code
+            code = (structured_params.drg_code or
+                    await drg_code_from_phrase(session, structured_params.procedure or ""))
+            if not code:
+                # we can't satisfy this template – let the caller know
+                return []
+            constants.append(code)
+
+        elif "d.drg_description" in tmpl:
+            constants.append(f"%{structured_params.procedure or ''}%")
+
+        # --- 2. geography ---------------------------------------------
+        if "provider_state" in tmpl:
+            constants.append(structured_params.state or "")
+        if "provider_city"  in tmpl and "provider_city ilike" in tmpl:
+            constants.append(f"%{structured_params.city or ''}%")
+
+        # --- 3. LIMIT --------------------------------------------------
+        if "$3" in tmpl or "limit $" in tmpl:
+            constants.append(str(structured_params.limit or 10))
+
+        logger.info("Extracted template constants: %s", constants)
+        return constants
+    
+    async def _generate_structured_sql(self, structured_params: StructuredQuery) -> Optional[str]:
+        """Generate SQL query from structured parameters for template matching"""
+        try:
+            # Build SQL based on query type and parameters
+            if structured_params.query_type == QueryType.CHEAPEST_PROVIDER:
+                sql_parts = ["SELECT p.provider_name, pp.average_covered_charges, p.provider_city, p.provider_state"]
+                sql_parts.append("FROM providers p")
+                sql_parts.append("JOIN provider_procedures pp ON p.provider_id = pp.provider_id")
+                sql_parts.append("JOIN drg_procedures d ON pp.drg_code = d.drg_code")
+                
+                where_conditions = []
+                if structured_params.procedure:
+                    where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
+                if structured_params.state:
+                    where_conditions.append("p.provider_state = '{}'".format(structured_params.state))
+                if structured_params.city:
+                    where_conditions.append("p.provider_city ILIKE '%{}%'".format(structured_params.city))
+                    
+                if where_conditions:
+                    sql_parts.append("WHERE " + " AND ".join(where_conditions))
+                    
+                sql_parts.append("ORDER BY pp.average_covered_charges")
+                sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
+                
+            elif structured_params.query_type == QueryType.HIGHEST_RATED:
+                sql_parts = ["SELECT p.provider_name, pr.overall_rating, p.provider_city, p.provider_state"]
+                sql_parts.append("FROM providers p")
+                sql_parts.append("JOIN provider_ratings pr ON p.provider_id = pr.provider_id")
+                
+                if structured_params.procedure:
+                    sql_parts.append("JOIN provider_procedures pp ON p.provider_id = pp.provider_id")
+                    sql_parts.append("JOIN drg_procedures d ON pp.drg_code = d.drg_code")
+                
+                where_conditions = []
+                if structured_params.procedure:
+                    where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
+                if structured_params.state:
+                    where_conditions.append("p.provider_state = '{}'".format(structured_params.state))
+                if structured_params.min_rating:
+                    where_conditions.append("pr.overall_rating >= {}".format(structured_params.min_rating))
+                    
+                if where_conditions:
+                    sql_parts.append("WHERE " + " AND ".join(where_conditions))
+                    
+                sql_parts.append("ORDER BY pr.overall_rating DESC")
+                sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
+                
+            else:
+                # Default to cheapest provider query
+                return await self._generate_structured_sql(
+                    StructuredQuery(query_type=QueryType.CHEAPEST_PROVIDER, **structured_params.__dict__)
+                )
+            
+            return " ".join(sql_parts)
+            
+        except Exception as e:
+            logger.error(f"Structured SQL generation failed: {e}")
+            return None
+    
+    async def _lookup_drg_code(self, session: AsyncSession, procedure_description: str) -> Optional[str]:
+        """Look up DRG code from procedure description using database trigram search"""
+        try:
+            from sqlalchemy import text
+            
+            query = text("""
+                SELECT drg_code, drg_description,
+                       similarity(drg_description, :phrase) as sim_score
+                FROM drg_procedures
+                WHERE drg_description ILIKE '%' || :phrase || '%'
+                ORDER BY similarity(drg_description, :phrase) DESC
+                LIMIT 1
+            """)
+            
+            result = await session.execute(query, {"phrase": procedure_description})
+            row = result.fetchone()
+            
+            if row and row.sim_score > 0.3:  # Minimum similarity threshold
+                logger.info(f"DRG lookup: '{procedure_description}' -> '{row.drg_code}' ({row.drg_description})")
+                return row.drg_code
+            
+            logger.warning(f"No DRG match found for: {procedure_description}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"DRG lookup failed: {e}")
+            return None
+    
+    async def _generate_with_structured_rag(
         self,
         session: AsyncSession,
         user_query: str,
+        structured_params: StructuredQuery,
         max_attempts: int = 3
     ) -> QueryResult:
-        """Generate SQL using RAG with template examples"""
+        """Generate SQL using RAG with template examples, using structured parameters"""
         try:
             # Get template suggestions for context
             template_suggestions = await self.template_service.get_template_suggestions(
@@ -162,7 +312,7 @@ class EnhancedAIService:
             )
             
             # Build RAG prompt with examples
-            rag_prompt = self._build_rag_prompt(user_query, template_suggestions)
+            rag_prompt = self._build_rag_prompt(user_query, template_suggestions, structured_params)
             
             # Generate SQL with multiple attempts
             for attempt in range(max_attempts):
@@ -210,10 +360,10 @@ class EnhancedAIService:
             )
             
         except Exception as e:
-            logger.error(f"RAG generation failed: {e}")
-            return QueryResult(success=False, message="RAG generation failed")
+            logger.error(f"Structured RAG generation failed: {e}")
+            return QueryResult(success=False, message="Structured RAG generation failed")
     
-    def _build_rag_prompt(self, user_query: str, template_suggestions: List[TemplateMatch]) -> str:
+    def _build_rag_prompt(self, user_query: str, template_suggestions: List[TemplateMatch], structured_params: StructuredQuery) -> str:
         """Build RAG prompt with template examples"""
         prompt = f"""
         {self.healthcare_context}
@@ -231,6 +381,7 @@ class EnhancedAIService:
         
         prompt += f"""
         User Query: {user_query}
+        Structured Parameters: {structured_params}
         
         Generate a PostgreSQL SELECT query that answers the user's question.
         Requirements:

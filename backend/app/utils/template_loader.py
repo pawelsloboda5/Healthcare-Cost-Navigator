@@ -51,6 +51,10 @@ class TemplateService:
             # Normalize the SQL query
             normalized_sql, constants = self.normalizer.normalize_sql(sql_query)
             
+            logger.info(f"SQL normalization - Original: {sql_query}")
+            logger.info(f"SQL normalization - Normalized: {normalized_sql}")  
+            logger.info(f"SQL normalization - Constants extracted: {constants}")
+            
             # Search for matching templates
             best_match = await self.vector_engine.find_best_template_match(
                 session=session,
@@ -76,9 +80,10 @@ class TemplateService:
         user_constants: List[str]
     ) -> Tuple[str, List[ParameterMapping]]:
         """
-        Map user constants to template parameters
+        Map user constants to template parameters (simplified approach)
         
         Args:
+            session: Database session
             template_sql: Template SQL with $1, $2, etc. placeholders
             user_constants: Constants extracted from user query
             
@@ -87,16 +92,19 @@ class TemplateService:
         """
         try:
             import re
+            
             mappings = []
             parameterized_sql = template_sql
             
-            # Map constants to parameters in order
+            logger.info(f"Parameter mapping - Template SQL: {template_sql}")
+            logger.info(f"Parameter mapping - User constants: {user_constants}")
+            
+            # Simple positional mapping - structured parser handles semantic extraction
             for i, constant in enumerate(user_constants, 1):
                 param_name = f"${i}"
                 
-                # Determine data type
+                # Determine data type and create mapping
                 data_type = self._determine_data_type(constant)
-                
                 mapping = ParameterMapping(
                     parameter_name=param_name,
                     original_value=constant,
@@ -104,11 +112,24 @@ class TemplateService:
                 )
                 mappings.append(mapping)
                 
-                # Replace placeholder (quoted *or* bare) in SQL with actual value
-                # This matches both $1 and '$1' patterns
-                placeholder_re = re.compile(rf"('?){re.escape(param_name)}('?)")
-                replacement = f"'{constant}'" if data_type == "string" else constant
-                parameterized_sql = placeholder_re.sub(replacement, parameterized_sql)
+                # Replace in SQL based on context
+                if f"ILIKE '{param_name}'" in parameterized_sql:
+                    # Handle ILIKE patterns
+                    replacement = f"ILIKE '%{constant.strip('%')}%'"
+                    parameterized_sql = parameterized_sql.replace(f"ILIKE '{param_name}'", replacement)
+                elif f"LIKE '{param_name}'" in parameterized_sql:
+                    # Handle LIKE patterns  
+                    replacement = f"LIKE '%{constant.strip('%')}%'"
+                    parameterized_sql = parameterized_sql.replace(f"LIKE '{param_name}'", replacement)
+                else:
+                    # Standard parameter replacement
+                    placeholder_re = re.compile(rf"('?){re.escape(param_name)}('?)")
+                    if data_type == "string":
+                        replacement = f"'{constant}'"
+                        parameterized_sql = placeholder_re.sub(replacement, parameterized_sql)
+                    else:
+                        replacement = constant
+                        parameterized_sql = placeholder_re.sub(replacement, parameterized_sql)
             
             logger.debug(f"Parameter mapping - Template: {template_sql}, "
                         f"Result: {parameterized_sql}, "
@@ -123,17 +144,30 @@ class TemplateService:
     def _determine_data_type(self, value: str) -> str:
         """Determine the data type of a constant value"""
         try:
-            # Try to parse as number
+            # Check for boolean first
+            if value.lower() in ('true', 'false', 't', 'f'):
+                return "boolean"
+            
+            # Special handling for DRG codes - they're stored as strings in the database
+            # DRG codes are typically 3-digit numbers like "521", "470", etc.
+            if value.isdigit() and len(value) <= 4:
+                # This could be a DRG code, treat as string to be safe
+                # Since DRG codes in our schema are String(10), not integers
+                return "string"
+            
+            # Try to parse as number for other cases
             if '.' in value:
                 float(value)
                 return "float"
             else:
+                # For longer numeric strings or explicit integers, treat as integer
                 int(value)
-                return "integer"
+                # Only treat as integer if it's a reasonable integer (not a code)
+                if len(value) > 4:  # Longer numbers are likely real integers
+                    return "integer"
+                else:
+                    return "string"  # Short numeric strings are likely codes
         except ValueError:
-            # Check for boolean
-            if value.lower() in ('true', 'false', 't', 'f'):
-                return "boolean"
             # Default to string
             return "string"
     

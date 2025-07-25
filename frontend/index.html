@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Healthcare Cost Navigator - AI Assistant</title>
+</head>
+<body>
+    <h1>Healthcare Cost Navigator</h1>
+    <p><strong>AI-Powered Hospital Search & Cost Analysis</strong></p>
+    
+    <!-- AI Assistant Section -->
+    <section>
+        <h2>🤖 AI Assistant - Natural Language Queries</h2>
+        <p>Ask questions in plain English about hospital costs, quality ratings, and procedures.</p>
+        
+        <div>
+            <textarea id="aiQuestion" rows="3" cols="80" placeholder="Ask me anything about healthcare costs... (e.g., 'Who has the cheapest hip replacement in NY?')"></textarea>
+            <br><br>
+            <button onclick="askAI()">Ask AI Assistant</button>
+            <button onclick="clearAIResults()">Clear</button>
+        </div>
+        
+        <div>
+            <h3>📋 Example Questions (Click to try):</h3>
+            <ul>
+                <li><a href="#" onclick="setQuestion('Who has the cheapest hip replacement in NY?')">Who has the cheapest hip replacement in NY?</a></li>
+                <li><a href="#" onclick="setQuestion('Find highest rated hospitals for heart surgery')">Find highest rated hospitals for heart surgery</a></li>
+                <li><a href="#" onclick="setQuestion('What are the most expensive procedures in California?')">What are the most expensive procedures in California?</a></li>
+                <li><a href="#" onclick="setQuestion('Show me volume leaders for DRG 470')">Show me volume leaders for DRG 470</a></li>
+                <li><a href="#" onclick="setQuestion('Compare costs for knee replacement between NY and TX')">Compare costs for knee replacement between NY and TX</a></li>
+                <li><a href="#" onclick="setQuestion('Which hospitals have ratings above 8 in Florida?')">Which hospitals have ratings above 8 in Florida?</a></li>
+            </ul>
+        </div>
+        
+        <div id="aiResults">
+            <h3>AI Response:</h3>
+            <div id="aiAnswer"></div>
+            <div id="aiDetails"></div>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Provider Search Section -->
+    <section>
+        <h2>🏥 Provider Search</h2>
+        
+        <div>
+            <h3>Search by Criteria</h3>
+            <form onsubmit="searchProviders(event)">
+                <table border="1">
+                    <tr>
+                        <td><label>State:</label></td>
+                        <td><input type="text" id="searchState" placeholder="NY" maxlength="2"></td>
+                        <td><label>City:</label></td>
+                        <td><input type="text" id="searchCity" placeholder="New York"></td>
+                    </tr>
+                    <tr>
+                        <td><label>DRG Code:</label></td>
+                        <td><input type="text" id="searchDrg" placeholder="470"></td>
+                        <td><label>Min Rating:</label></td>
+                        <td><input type="number" id="searchRating" min="1" max="10" step="0.1" placeholder="8.0"></td>
+                    </tr>
+                    <tr>
+                        <td><label>Max Cost:</label></td>
+                        <td><input type="number" id="searchCost" placeholder="100000"></td>
+                        <td><label>Limit:</label></td>
+                        <td><input type="number" id="searchLimit" value="10" min="1" max="50"></td>
+                    </tr>
+                </table>
+                <br>
+                <button type="submit">Search Providers</button>
+                <button type="button" onclick="clearProviderSearch()">Clear</button>
+            </form>
+        </div>
+        
+        <div>
+            <h3>Quick Searches</h3>
+            <button onclick="getCheapestProviders('470')">Cheapest DRG 470 (Hip Replacement)</button>
+            <button onclick="getCheapestProviders('191')">Cheapest DRG 191 (Heart Surgery)</button>
+            <button onclick="getHighestRated()">Highest Rated Providers</button>
+            <button onclick="getVolumeLeaders('470')">Volume Leaders DRG 470</button>
+        </div>
+        
+        <div id="providerResults">
+            <h3>Provider Results:</h3>
+            <div id="providerList"></div>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Cost Analysis Section -->
+    <section>
+        <h2>💰 Cost Analysis</h2>
+        <div>
+            <label>Analyze costs for DRG Code:</label>
+            <input type="text" id="analysisCode" placeholder="470" maxlength="10">
+            <label>State (optional):</label>
+            <input type="text" id="analysisState" placeholder="NY" maxlength="2">
+            <button onclick="analyzeCosts()">Analyze Costs</button>
+        </div>
+        
+        <div id="costAnalysis">
+            <h3>Cost Analysis Results:</h3>
+            <div id="costDetails"></div>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- System Status -->
+    <section>
+        <h2>📊 System Status</h2>
+        <button onclick="checkHealth()">Check API Health</button>
+        <button onclick="getTemplateStats()">Template Statistics</button>
+        
+        <div id="systemStatus">
+            <div id="healthStatus"></div>
+            <div id="templateStats"></div>
+        </div>
+    </section>
+
+    <hr>
+
+    <!-- Raw Data Viewer -->
+    <section>
+        <h2>🔍 Raw Data Viewer</h2>
+        <p>View raw JSON responses for debugging</p>
+        <button onclick="toggleRawData()">Toggle Raw Data Display</button>
+        
+        <div id="rawDataContainer" style="display: none;">
+            <h3>Last API Response:</h3>
+            <pre id="rawData"></pre>
+        </div>
+    </section>
+
+    <!-- Loading indicator -->
+    <div id="loading" style="display: none;">
+        <h3>⏳ Loading...</h3>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <hr>
+        <p><strong>Healthcare Cost Navigator v1.0</strong> - AI-Powered Hospital Search</p>
+        <p>Built with FastAPI, PostgreSQL, OpenAI GPT-4, and pgvector</p>
+        <p>Features: Natural Language Processing, Template Matching, Vector Search, DRG Lookup</p>
+    </footer>
+
+    <script src="app.js"></script>
+    <script src="ws.js"></script>
+</body>
+</html>
