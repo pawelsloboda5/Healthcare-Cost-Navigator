@@ -31,7 +31,7 @@ class Settings:
     MAX_QUERY_LIMIT: int = 100
     
     # Template matching settings
-    TEMPLATE_CONFIDENCE_THRESHOLD: float = 0.75
+    TEMPLATE_CONFIDENCE_THRESHOLD: float = 0.7
     TEMPLATE_SIMILARITY_THRESHOLD: float = 0.7
     
     # Safety settings

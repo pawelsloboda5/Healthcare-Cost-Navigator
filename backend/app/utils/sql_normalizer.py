@@ -57,30 +57,33 @@ class SQLNormalizer:
         normalized = sql
         placeholder_counter = 1
         
-        # Replace string literals
+        # Replace string literals first
         def replace_string(match):
             nonlocal placeholder_counter
-            constants.append(match.group(1))
+            # Extract the content inside the quotes
+            string_value = match.group(1)
+            constants.append(string_value)
             placeholder = f"${placeholder_counter}"
             placeholder_counter += 1
             return f"'{placeholder}'"
             
         normalized = self.string_pattern.sub(replace_string, normalized)
         
-        # Replace numeric literals (but not existing placeholders)
+        # Replace numeric literals (but avoid existing placeholders)
+        # Use a more robust pattern that doesn't match $n patterns
+        number_pattern = re.compile(r'(?<!\$)\b\d+(?:\.\d+)?\b')
+        
         def replace_number(match):
             nonlocal placeholder_counter
             number = match.group(0)
-            # Skip if this is already a placeholder
-            if normalized[max(0, match.start()-1):match.start()] == '$':
-                return number
             constants.append(number)
             placeholder = f"${placeholder_counter}"
             placeholder_counter += 1
             return placeholder
             
-        normalized = self.number_pattern.sub(replace_number, normalized)
+        normalized = number_pattern.sub(replace_number, normalized)
         
+        logger.debug(f"Constants extracted: {constants}")
         return normalized, constants
     
     def _apply_additional_normalization(self, sql: str) -> str:
@@ -106,24 +109,33 @@ class SQLNormalizer:
         """Fallback basic normalization when sqlglot fails"""
         constants = []
         normalized = sql.lower()
+        placeholder_counter = 1
         
         # Extract string constants
         def replace_string(match):
+            nonlocal placeholder_counter
             constants.append(match.group(1))
-            return "'$const'"
+            placeholder = f"${placeholder_counter}"
+            placeholder_counter += 1
+            return f"'{placeholder}'"
             
         normalized = self.string_pattern.sub(replace_string, normalized)
         
-        # Extract numeric constants
+        # Extract numeric constants - use improved pattern to avoid $n placeholders
+        number_pattern = re.compile(r'(?<!\$)\b\d+(?:\.\d+)?\b')
         def replace_number(match):
+            nonlocal placeholder_counter
             constants.append(match.group(0))
-            return '$const'
+            placeholder = f"${placeholder_counter}"
+            placeholder_counter += 1
+            return placeholder
             
-        normalized = self.number_pattern.sub(replace_number, normalized)
+        normalized = number_pattern.sub(replace_number, normalized)
         
         # Normalize whitespace
         normalized = re.sub(r'\s+', ' ', normalized).strip()
         
+        logger.debug(f"Basic normalize - Constants extracted: {constants}")
         return normalized, constants
     
     def validate_sql_safety(self, sql: str) -> bool:

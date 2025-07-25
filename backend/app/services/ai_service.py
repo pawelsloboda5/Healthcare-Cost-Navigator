@@ -120,7 +120,7 @@ class EnhancedAIService:
             template_match, normalized_sql, constants = await self.template_service.normalize_and_search(
                 session=session,
                 sql_query=initial_sql,
-                confidence_threshold=0.75
+                confidence_threshold=0.7
             )
             
             if template_match:

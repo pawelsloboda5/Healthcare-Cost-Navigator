@@ -85,10 +85,10 @@ class VectorSearchEngine:
                     canonical_sql,
                     raw_sql,
                     comment,
-                    1 - (embedding <=> :query_embedding::vector) as similarity_score
+                    1 - (embedding <=> (:query_embedding)::vector) as similarity_score
                 FROM template_catalog
-                WHERE 1 - (embedding <=> :query_embedding::vector) >= :threshold
-                ORDER BY embedding <=> :query_embedding::vector
+                WHERE 1 - (embedding <=> (:query_embedding)::vector) >= :threshold
+                ORDER BY embedding <=> (:query_embedding)::vector
                 LIMIT :limit
             """)
             
@@ -117,6 +117,7 @@ class VectorSearchEngine:
             
         except Exception as e:
             logger.error(f"Vector search failed for query: {query_sql}, error: {e}")
+            await session.rollback()
             return []
     
     async def find_best_template_match(
@@ -124,7 +125,7 @@ class VectorSearchEngine:
         session: AsyncSession,
         normalized_sql: str,
         original_sql: str,
-        confidence_threshold: float = 0.8
+        confidence_threshold: float = 0.7
     ) -> Optional[TemplateMatch]:
         """
         Find the best matching template with confidence scoring
@@ -180,6 +181,7 @@ class VectorSearchEngine:
                 
         except Exception as e:
             logger.error(f"Template matching failed for SQL: {normalized_sql}, error: {e}")
+            await session.rollback()
             return None
     
     async def add_template_to_catalog(
@@ -209,7 +211,7 @@ class VectorSearchEngine:
             # Insert into catalog
             query = text("""
                 INSERT INTO template_catalog (canonical_sql, raw_sql, comment, embedding)
-                VALUES (:canonical_sql, :raw_sql, :comment, :embedding::vector)
+                VALUES (:canonical_sql, :raw_sql, :comment, (:embedding)::vector)
                 RETURNING template_id
             """)
             

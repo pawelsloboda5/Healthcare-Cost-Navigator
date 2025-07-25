@@ -34,7 +34,7 @@ class TemplateService:
         self,
         session: AsyncSession,
         sql_query: str,
-        confidence_threshold: float = 0.8
+        confidence_threshold: float = 0.7
     ) -> Tuple[Optional[TemplateMatch], str, List[str]]:
         """
         Normalize SQL and search for matching templates
@@ -67,6 +67,7 @@ class TemplateService:
             
         except Exception as e:
             logger.error(f"Template normalization and search failed: {e}")
+            await session.rollback()
             return None, "", []
     
     def map_parameters(
@@ -85,6 +86,7 @@ class TemplateService:
             Tuple of (parameterized_sql, parameter_mappings)
         """
         try:
+            import re
             mappings = []
             parameterized_sql = template_sql
             
@@ -102,11 +104,11 @@ class TemplateService:
                 )
                 mappings.append(mapping)
                 
-                # Replace placeholder in SQL with actual value
-                if data_type == "string":
-                    parameterized_sql = parameterized_sql.replace(f"'{param_name}'", f"'{constant}'")
-                else:
-                    parameterized_sql = parameterized_sql.replace(param_name, constant)
+                # Replace placeholder (quoted *or* bare) in SQL with actual value
+                # This matches both $1 and '$1' patterns
+                placeholder_re = re.compile(rf"('?){re.escape(param_name)}('?)")
+                replacement = f"'{constant}'" if data_type == "string" else constant
+                parameterized_sql = placeholder_re.sub(replacement, parameterized_sql)
             
             logger.debug(f"Parameter mapping - Template: {template_sql}, "
                         f"Result: {parameterized_sql}, "
@@ -193,6 +195,7 @@ class TemplateService:
             
         except Exception as e:
             logger.error(f"Template execution failed: {e}")
+            await session.rollback()
             return False, f"Query execution failed: {str(e)}", None
     
     async def learn_from_successful_query(
@@ -253,6 +256,7 @@ class TemplateService:
             
         except Exception as e:
             logger.error(f"Failed to learn from successful query: {e}")
+            await session.rollback()
             return False
     
     async def get_template_suggestions(
@@ -285,10 +289,10 @@ class TemplateService:
                     canonical_sql,
                     raw_sql,
                     comment,
-                    1 - (embedding <=> :query_embedding::vector) as similarity_score
+                    1 - (embedding <=> (:query_embedding)::vector) as similarity_score
                 FROM template_catalog
                 WHERE comment IS NOT NULL AND comment != ''
-                ORDER BY embedding <=> :query_embedding::vector
+                ORDER BY embedding <=> (:query_embedding)::vector
                 LIMIT :limit
             """)
             
@@ -316,4 +320,5 @@ class TemplateService:
             
         except Exception as e:
             logger.error(f"Failed to get template suggestions: {e}")
+            await session.rollback()
             return []
