@@ -99,6 +99,7 @@ class TemplateSeeder:
                 "raw_sql": """
                     SELECT p.provider_name,
                            pp.average_covered_charges,
+                           d.drg_description,
                            p.provider_city,
                            p.provider_state
                     FROM providers p
@@ -141,9 +142,11 @@ class TemplateSeeder:
                 "raw_sql": """
                     SELECT p.provider_name,
                            pp.total_discharges,
-                           pp.average_covered_charges
+                           pp.average_covered_charges,
+                           d.drg_description
                     FROM providers p
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
                     WHERE pp.drg_code = $1
                     ORDER BY pp.total_discharges DESC
                     LIMIT $2;
@@ -210,10 +213,12 @@ class TemplateSeeder:
                            pp.average_medicare_payments,
                            (pp.average_covered_charges - pp.average_medicare_payments)
                                AS patient_cost,
+                           d.drg_description,
                            p.provider_city,
                            p.provider_state
                     FROM providers p
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
                     WHERE pp.drg_code = $1
                       AND p.provider_zip_code LIKE $2
                     ORDER BY patient_cost
@@ -226,6 +231,7 @@ class TemplateSeeder:
                     SELECT p.provider_name,
                            pp.average_covered_charges,
                            pr.overall_rating,
+                           d.drg_description,
                            p.provider_city,
                            p.provider_state,
                            (pp.average_covered_charges * 0.3 +
@@ -233,6 +239,7 @@ class TemplateSeeder:
                     FROM providers p
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
                     JOIN provider_ratings pr    ON p.provider_id = pr.provider_id
+                    JOIN drg_procedures d       ON pp.drg_code = d.drg_code
                     WHERE pp.drg_code = $1
                       AND p.provider_state = $2
                     ORDER BY cost_quality_score

@@ -213,7 +213,7 @@ class EnhancedAIService:
         try:
             # Build SQL based on query type and parameters
             if structured_params.query_type == QueryType.CHEAPEST_PROVIDER:
-                sql_parts = ["SELECT p.provider_name, pp.average_covered_charges, p.provider_city, p.provider_state"]
+                sql_parts = ["SELECT p.provider_name, pp.average_covered_charges, d.drg_description, p.provider_city, p.provider_state"]
                 sql_parts.append("FROM providers p")
                 sql_parts.append("JOIN provider_procedures pp ON p.provider_id = pp.provider_id")
                 sql_parts.append("JOIN drg_procedures d ON pp.drg_code = d.drg_code")
