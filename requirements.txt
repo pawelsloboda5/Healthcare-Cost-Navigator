@@ -1,0 +1,33 @@
+# --- core framework & web server ---
+fastapi[standard]==0.112.0		
+uvicorn[standard]==0.35.0     # ASGI server with reload, http/2, etc.
+
+# --- async database stack ---
+SQLAlchemy[asyncio]==2.0.41
+asyncpg==0.29.0               # pure-async PostgreSQL driver
+psycopg2-binary==2.9.9        # optional: admin CLI / psql scripts
+alembic==1.13.1               # migrations
+
+# --- geospatial goodies ---
+GeoAlchemy2==0.18.0           # SQLAlchemy ↔ PostGIS types
+shapely==2.1.1                # helper maths if you need it
+
+# --- data wrangling & ETL ---
+pandas==2.2.2
+numpy==1.26.4
+
+# --- networking & geocoding ---
+httpx==0.28.1                 # async HTTP (Nominatim, etc.)
+python-dotenv==1.0.1          # load env vars in dev
+
+# --- OpenAI & AI tooling ---
+openai==1.97.1
+pydantic==2.11.0             # prompt-output validation
+
+# --- streaming & metrics ---
+sse-starlette==0.6.1          # Server-Sent Events (EventSourceResponse)
+prometheus-client==0.20.0     # /metrics endpoint
+
+# --- testing ---
+pytest==8.4.0
+pytest-asyncio==1.0.0
