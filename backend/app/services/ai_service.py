@@ -492,7 +492,7 @@ class EnhancedAIService:
         sql_query: str,
         results: List[Dict]
     ) -> str:
-        """Generate natural language explanation of query results"""
+        """Generate natural language explanation of query results using GPT-4o-mini for speed"""
         try:
             results_summary = f"Found {len(results)} results"
             if results:
@@ -507,12 +507,13 @@ class EnhancedAIService:
             
             Provide a brief, natural language explanation of what these results show.
             Focus on answering the user's original question.
+            Be concise and helpful.
             """
             
             response = await self.openai_client.chat.completions.create(
-                model="gpt-4",
+                model="gpt-4o-mini",  
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=300,
+                max_tokens=600,
                 temperature=0.3
             )
             
