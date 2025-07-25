@@ -151,6 +151,11 @@ async function searchProviders(event) {
 
         const data = await response.json();
         updateRawData(data);
+        
+        if (!response.ok) {
+            throw new Error(data.detail || `HTTP ${response.status}`);
+        }
+        
         displayProviderResults(data, 'Provider Search Results');
     } catch (error) {
         document.getElementById('providerList').innerHTML = handleApiError(error, 'Provider Search');
@@ -165,6 +170,11 @@ async function getCheapestProviders(drgCode) {
         const response = await fetch(`${API_BASE}/providers/cheapest/${drgCode}?limit=10`);
         const data = await response.json();
         updateRawData(data);
+        
+        if (!response.ok) {
+            throw new Error(data.detail || `HTTP ${response.status}`);
+        }
+        
         displayProviderResults(data, `Cheapest Providers for DRG ${drgCode}`);
     } catch (error) {
         document.getElementById('providerList').innerHTML = handleApiError(error, 'Cheapest Providers');
@@ -179,6 +189,11 @@ async function getHighestRated() {
         const response = await fetch(`${API_BASE}/providers/highest-rated?limit=10`);
         const data = await response.json();
         updateRawData(data);
+        
+        if (!response.ok) {
+            throw new Error(data.detail || `HTTP ${response.status}`);
+        }
+        
         displayProviderResults(data, 'Highest Rated Providers');
     } catch (error) {
         document.getElementById('providerList').innerHTML = handleApiError(error, 'Highest Rated Providers');
@@ -193,6 +208,11 @@ async function getVolumeLeaders(drgCode) {
         const response = await fetch(`${API_BASE}/providers/volume-leaders/${drgCode}?limit=10`);
         const data = await response.json();
         updateRawData(data);
+        
+        if (!response.ok) {
+            throw new Error(data.detail || `HTTP ${response.status}`);
+        }
+        
         displayProviderResults(data, `Volume Leaders for DRG ${drgCode}`);
     } catch (error) {
         document.getElementById('providerList').innerHTML = handleApiError(error, 'Volume Leaders');
