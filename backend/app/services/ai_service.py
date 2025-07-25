@@ -50,16 +50,19 @@ class EnhancedAIService:
         Tables and Columns:
         - providers: provider_id, provider_name, provider_city, provider_state, provider_zip_code, provider_address, provider_ruca, provider_ruca_description
         - drg_procedures: drg_code, drg_description  
-        - provider_procedures: provider_id, drg_code, total_discharges, average_covered_charges, average_total_payments, average_medicare_payments
+        - provider_procedures: provider_id, drg_code, total_discharges, average_covered_charges, average_total_payments, average_medicare_payments, provider_state
         - provider_ratings: provider_id, overall_rating, quality_rating, safety_rating, patient_experience_rating
+        
+        PERFORMANCE OPTIMIZATION: Use provider_procedures.provider_state instead of joining to providers table for state filtering.
         
         Key relationships:
         - providers.provider_id → provider_procedures.provider_id
         - drg_procedures.drg_code → provider_procedures.drg_code
         - providers.provider_id → provider_ratings.provider_id
         
-        IMPORTANT: Use exact column names:
-        - State column is 'provider_state' NOT 'state'  
+        IMPORTANT: Use exact column names and OPTIMIZED queries:
+        - State filtering: 'pp.provider_state = ?' NOT 'p.provider_state = ?'
+        - Avoid unnecessary JOINs to providers table when only state is needed
         - DRG description is 'drg_description' NOT 'description'
         - Provider name is 'provider_name'
         - Costs are 'average_covered_charges', 'average_total_payments', 'average_medicare_payments'
@@ -193,7 +196,31 @@ class EnhancedAIService:
             constants.append(code)
 
         elif "d.drg_description" in tmpl:
-            constants.append(f"%{structured_params.procedure or ''}%")
+            # For description matching, use semantic lookup to find the best DRG
+            procedure_term = structured_params.procedure or ""
+            
+            # Try to find the best matching DRG via semantic search
+            drg_code = await drg_code_from_phrase(session, procedure_term)
+            if drg_code:
+                # Get the actual DRG description for exact matching
+                try:
+                    from sqlalchemy import text
+                    result = await session.execute(
+                        text("SELECT drg_description FROM drg_procedures WHERE drg_code = :code"),
+                        {"code": drg_code}
+                    )
+                    row = result.fetchone()
+                    if row:
+                        # Use the actual medical DRG description for better matching
+                        constants.append(f"%{row.drg_description}%")
+                    else:
+                        constants.append(f"%{procedure_term}%")
+                except Exception as e:
+                    logger.warning(f"Failed to get DRG description for {drg_code}: {e}")
+                    constants.append(f"%{procedure_term}%")
+            else:
+                # No semantic match found, use original term
+                constants.append(f"%{procedure_term}%")
 
         # --- 2. geography ---------------------------------------------
         if "provider_state" in tmpl:
@@ -213,18 +240,16 @@ class EnhancedAIService:
         try:
             # Build SQL based on query type and parameters
             if structured_params.query_type == QueryType.CHEAPEST_PROVIDER:
-                sql_parts = ["SELECT p.provider_name, pp.average_covered_charges, d.drg_description, p.provider_city, p.provider_state"]
-                sql_parts.append("FROM providers p")
-                sql_parts.append("JOIN provider_procedures pp ON p.provider_id = pp.provider_id")
-                sql_parts.append("JOIN drg_procedures d ON pp.drg_code = d.drg_code")
+                # OPTIMIZED: Use denormalized provider_state to avoid expensive JOIN to providers table
+                sql_parts = ["SELECT d.drg_description, pp.average_covered_charges, pp.provider_id"]
+                sql_parts.append("FROM drg_procedures d")
+                sql_parts.append("JOIN provider_procedures pp ON d.drg_code = pp.drg_code")
                 
                 where_conditions = []
                 if structured_params.procedure:
                     where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
                 if structured_params.state:
-                    where_conditions.append("p.provider_state = '{}'".format(structured_params.state))
-                if structured_params.city:
-                    where_conditions.append("p.provider_city ILIKE '%{}%'".format(structured_params.city))
+                    where_conditions.append("pp.provider_state = '{}'".format(structured_params.state))
                     
                 if where_conditions:
                     sql_parts.append("WHERE " + " AND ".join(where_conditions))
@@ -232,7 +257,27 @@ class EnhancedAIService:
                 sql_parts.append("ORDER BY pp.average_covered_charges")
                 sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
                 
+            elif structured_params.query_type == QueryType.COST_COMPARISON:
+                # OPTIMIZED: Use denormalized provider_state for cost comparisons
+                sql_parts = ["SELECT d.drg_code, d.drg_description, AVG(pp.average_covered_charges) as avg_cost"]
+                sql_parts.append("FROM drg_procedures d")
+                sql_parts.append("JOIN provider_procedures pp ON d.drg_code = pp.drg_code")
+                
+                where_conditions = []
+                if structured_params.procedure:
+                    where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
+                if structured_params.state:
+                    where_conditions.append("pp.provider_state = '{}'".format(structured_params.state))
+                    
+                if where_conditions:
+                    sql_parts.append("WHERE " + " AND ".join(where_conditions))
+                    
+                sql_parts.append("GROUP BY d.drg_code, d.drg_description")
+                sql_parts.append("ORDER BY avg_cost DESC")
+                sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
+                
             elif structured_params.query_type == QueryType.HIGHEST_RATED:
+                # Note: For ratings, we still need to join providers table
                 sql_parts = ["SELECT p.provider_name, pr.overall_rating, p.provider_city, p.provider_state"]
                 sql_parts.append("FROM providers p")
                 sql_parts.append("JOIN provider_ratings pr ON p.provider_id = pr.provider_id")
@@ -256,9 +301,9 @@ class EnhancedAIService:
                 sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
                 
             else:
-                # Default to cheapest provider query
+                # Default to cost comparison query (most common)
                 return await self._generate_structured_sql(
-                    StructuredQuery(query_type=QueryType.CHEAPEST_PROVIDER, **structured_params.__dict__)
+                    StructuredQuery(query_type=QueryType.COST_COMPARISON, **structured_params.__dict__)
                 )
             
             return " ".join(sql_parts)

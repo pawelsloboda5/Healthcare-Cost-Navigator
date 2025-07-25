@@ -266,7 +266,165 @@ class TemplateSeeder:
                 """,
                 "comment": "Multi-procedure providers in a city with good ratings",
             },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_state = $2
+                    ORDER BY pp.average_covered_charges ASC
+                    LIMIT $3;
+                """,
+                "comment": "Cheapest providers for a procedure by description in a state",
+            },
+            {
+                "raw_sql": """
+                    SELECT d.drg_code,
+                           d.drg_description,
+                           COUNT(*) AS provider_count,
+                           AVG(pp.average_covered_charges) AS avg_cost,
+                           MIN(pp.average_covered_charges) AS min_cost
+                    FROM drg_procedures d
+                    JOIN provider_procedures pp ON d.drg_code = pp.drg_code
+                    JOIN providers p ON pp.provider_id = p.provider_id
+                    WHERE p.provider_state = $1
+                    GROUP BY d.drg_code, d.drg_description
+                    ORDER BY avg_cost ASC
+                    LIMIT $2;
+                """,
+                "comment": "Cheapest procedures in a state ordered by average cost",
+            },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           pp.average_total_payments,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_code = $1
+                    ORDER BY pp.average_covered_charges ASC
+                    LIMIT $2;
+                """,
+                "comment": "Cheapest providers for a specific DRG procedure",
+            },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state,
+                           pp.total_discharges
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                    ORDER BY pp.average_covered_charges ASC
+                    LIMIT $2;
+                """,
+                "comment": "Find cheapest providers for any procedure by description",
+            },
         ]
+
+    # ────────────────────────────────────────────────────────────────────
+    # DRG Embeddings for Semantic Search
+    # ────────────────────────────────────────────────────────────────────
+    async def populate_drg_embeddings(self) -> None:
+        """
+        Generate and populate embeddings for DRG procedure descriptions
+        to enable semantic search (e.g., "heart surgery" -> "CORONARY BYPASS")
+        """
+        logger.info("Populating DRG procedure embeddings for semantic search...")
+        await init_db()
+
+        async with AsyncSessionLocal() as session:
+            try:
+                # Get all DRG procedures without embeddings
+                result = await session.execute(
+                    text("SELECT drg_code, drg_description FROM drg_procedures WHERE embedding IS NULL ORDER BY drg_code")
+                )
+                procedures = result.fetchall()
+                
+                if not procedures:
+                    logger.info("All DRG procedures already have embeddings")
+                    return
+
+                logger.info(f"Generating embeddings for {len(procedures)} DRG procedures...")
+                
+                # Process in batches to avoid overwhelming OpenAI API
+                batch_size = 20
+                processed = 0
+                
+                for i in range(0, len(procedures), batch_size):
+                    batch = procedures[i:i + batch_size]
+                    
+                    for proc in batch:
+                        try:
+                            # Generate embedding for the DRG description
+                            embedding = await self.get_embedding(proc.drg_description)
+                            
+                            if embedding:
+                                # Update the procedure with its embedding
+                                await session.execute(
+                                    text("""
+                                        UPDATE drg_procedures 
+                                        SET embedding = (:embedding)::vector 
+                                        WHERE drg_code = :drg_code
+                                    """),
+                                    {
+                                        "embedding": '[' + ','.join(map(str, embedding)) + ']',
+                                        "drg_code": proc.drg_code
+                                    }
+                                )
+                                processed += 1
+                                
+                                if processed % 10 == 0:
+                                    logger.info(f"Processed {processed}/{len(procedures)} DRG embeddings...")
+                            else:
+                                logger.warning(f"Failed to generate embedding for DRG {proc.drg_code}")
+                                
+                        except Exception as e:
+                            logger.error(f"Error processing DRG {proc.drg_code}: {e}")
+                            continue
+                    
+                    # Commit batch
+                    await session.commit()
+                    
+                    # Small delay to respect API rate limits
+                    if i + batch_size < len(procedures):
+                        await asyncio.sleep(1)
+
+                logger.info(f"Successfully populated embeddings for {processed} DRG procedures")
+
+                # Create vector index for DRG embeddings
+                try:
+                    await session.execute(
+                        text("""
+                            CREATE INDEX IF NOT EXISTS idx_drg_embedding
+                            ON drg_procedures
+                            USING ivfflat (embedding vector_cosine_ops)
+                            WITH (lists = 100);
+                        """)
+                    )
+                    await session.commit()
+                    logger.info("Created vector index for DRG embeddings")
+                except Exception as e:
+                    logger.warning(f"Failed to create DRG vector index (may already exist): {e}")
+
+            except Exception as exc:  # pragma: no cover
+                await session.rollback()
+                logger.error("DRG embedding population failed: %s", exc)
+                raise
 
     # ────────────────────────────────────────────────────────────────────
     # Main seeding routine
@@ -329,7 +487,28 @@ class TemplateSeeder:
 
 # ─── Entrypoint --------------------------------------------------------------
 async def main() -> None:
-    await TemplateSeeder().seed_templates()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Seed template catalog and DRG embeddings")
+    parser.add_argument(
+        "--mode", 
+        choices=["templates", "drg-embeddings", "both"], 
+        default="both",
+        help="What to populate: templates, drg-embeddings, or both (default: both)"
+    )
+    
+    args = parser.parse_args()
+    seeder = TemplateSeeder()
+    
+    if args.mode in ["templates", "both"]:
+        logger.info("Seeding SQL templates...")
+        await seeder.seed_templates()
+    
+    if args.mode in ["drg-embeddings", "both"]:
+        logger.info("Populating DRG embeddings for semantic search...")
+        await seeder.populate_drg_embeddings()
+    
+    logger.info("Seeding complete!")
 
 
 if __name__ == "__main__":

@@ -568,6 +568,12 @@ function createResultsTable(results) {
                 const ratingColor = rating >= 8 ? '#28a745' : rating >= 6 ? '#ffc107' : '#dc3545';
                 value = formatRating(value);
                 cellStyle += ` text-align: center; font-weight: 700; color: ${ratingColor}; font-size: 1.1em;`;
+            } else if (key === 'total_discharges' || key.includes('discharge') || key.includes('volume')) {
+                // Format volume/discharge numbers with commas, NOT currency
+                if (value && !isNaN(value)) {
+                    value = parseInt(value).toLocaleString();
+                }
+                cellStyle += ' text-align: center; font-weight: 600; color: #495057;';
             } else if (key === 'drg_description') {
                 // Special formatting for procedure descriptions
                 cellStyle += ' font-style: italic; max-width: 250px; color: #495057;';
@@ -576,8 +582,6 @@ function createResultsTable(results) {
                 }
             } else if (key === 'provider_name') {
                 cellStyle += ' font-weight: 600; color: #2c3e50;';
-            } else if (key === 'total_discharges') {
-                cellStyle += ' text-align: center; font-weight: 600; color: #495057;';
             } else if (value === null || value === undefined) {
                 value = 'N/A';
                 cellStyle += ' color: #adb5bd; font-style: italic;';

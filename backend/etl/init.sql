@@ -76,6 +76,38 @@ CREATE INDEX IF NOT EXISTS idx_avg_covered_charges
 CREATE INDEX IF NOT EXISTS idx_pp_drg_code
     ON provider_procedures(drg_code);
 
+-- PERFORMANCE OPTIMIZATIONS --
+-- Composite covering index for optimal query performance (matches alembic migration)
+CREATE INDEX IF NOT EXISTS idx_pp_state_drg_cost_inc
+    ON provider_procedures (drg_code, provider_id)
+    INCLUDE (average_covered_charges);
+
+-- Add provider_state column for denormalization (will be populated by ETL)
+ALTER TABLE provider_procedures 
+ADD COLUMN IF NOT EXISTS provider_state CHAR(2);
+
+-- Index on provider_state for direct filtering
+CREATE INDEX IF NOT EXISTS idx_pp_provider_state 
+    ON provider_procedures(provider_state);
+
+-- Create trigger function to keep provider_state in sync
+CREATE OR REPLACE FUNCTION trg_sync_provider_state() RETURNS trigger AS $$
+BEGIN
+    NEW.provider_state := (
+        SELECT provider_state 
+        FROM providers 
+        WHERE provider_id = NEW.provider_id
+    );
+    RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+-- Create trigger
+DROP TRIGGER IF EXISTS provider_state_sync_trigger ON provider_procedures;
+CREATE TRIGGER provider_state_sync_trigger
+    BEFORE INSERT OR UPDATE OF provider_id
+    ON provider_procedures
+    FOR EACH ROW EXECUTE FUNCTION trg_sync_provider_state();
+
 -- -----------------------------------------------------------------
 -- TABLE: provider_ratings  (mock or real CMS ratings)
 -- -----------------------------------------------------------------
@@ -132,6 +164,33 @@ CREATE TABLE IF NOT EXISTS template_catalog (
 --     ON template_catalog
 --     USING ivfflat (embedding vector_cosine_ops)
 --     WITH (lists = 100);
+
+-- -----------------------------------------------------------------
+-- MATERIALIZED VIEW: Pre-aggregated state costs (performance optimization)
+-- -----------------------------------------------------------------
+-- Note: This will be created by alembic migration after data is loaded
+-- Uncomment after data load for fresh installs:
+/*
+CREATE MATERIALIZED VIEW mv_state_drg_avg_cost AS
+SELECT 
+    pp.provider_state,
+    d.drg_code,
+    d.drg_description,
+    AVG(pp.average_covered_charges) AS avg_cost,
+    COUNT(*) AS provider_count,
+    MIN(pp.average_covered_charges) AS min_cost,
+    MAX(pp.average_covered_charges) AS max_cost
+FROM provider_procedures pp
+JOIN drg_procedures d ON pp.drg_code = d.drg_code
+WHERE pp.provider_state IS NOT NULL
+GROUP BY pp.provider_state, d.drg_code, d.drg_description;
+
+CREATE UNIQUE INDEX mv_state_drg_pk
+ON mv_state_drg_avg_cost (provider_state, drg_code);
+
+CREATE INDEX mv_state_drg_cost_desc
+ON mv_state_drg_avg_cost (provider_state, avg_cost DESC);
+*/
 
 -- -----------------------------------------------------------------
 -- Done

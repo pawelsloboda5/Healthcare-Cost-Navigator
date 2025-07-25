@@ -43,12 +43,16 @@ class DRGProcedure(Base):
     drg_code = Column(String(10), primary_key=True)
     drg_description = Column(Text, nullable=False)
     
+    # Vector embedding for semantic search of procedure descriptions
+    embedding = Column(Vector(1536))  # OpenAI text-embedding-3-small vector
+    
     # Relationships
     provider_procedures = relationship("ProviderProcedure", back_populates="drg_procedure")
     
-    # Index for text search
+    # Index for text search (fallback) and vector search
     __table_args__ = (
         Index('idx_drg_description', 'drg_description', postgresql_using='gin', postgresql_ops={'drg_description': 'gin_trgm_ops'}),
+        # Vector index will be created separately after embeddings are populated
     )
 
 class ProviderProcedure(Base):
@@ -63,6 +67,9 @@ class ProviderProcedure(Base):
     average_covered_charges = Column(Numeric(12, 2), nullable=False)
     average_total_payments = Column(Numeric(12, 2), nullable=False)
     average_medicare_payments = Column(Numeric(12, 2), nullable=False)
+    
+    # PERFORMANCE OPTIMIZATION: Denormalized provider state for faster queries
+    provider_state = Column(String(2))  # Eliminates expensive JOINs to providers table
     
     # Relationships
     provider = relationship("Provider", back_populates="procedures")
