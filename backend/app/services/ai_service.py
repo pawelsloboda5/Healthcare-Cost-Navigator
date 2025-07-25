@@ -308,7 +308,7 @@ class EnhancedAIService:
         sql: str,
         max_results: int = 100
     ) -> Tuple[bool, str, Optional[List[Dict]]]:
-        """Execute SQL with safety measures"""
+        """Execute SQL with safety measures and proper transaction handling"""
         try:
             # Add LIMIT if not present
             if 'limit' not in sql.lower():
@@ -328,6 +328,11 @@ class EnhancedAIService:
             
         except Exception as e:
             logger.error(f"SQL execution failed: {e}")
+            # Rollback the transaction to prevent abort state
+            try:
+                await session.rollback()
+            except Exception as rollback_error:
+                logger.error(f"Transaction rollback failed: {rollback_error}")
             return False, f"Query execution failed: {str(e)}", None
     
     async def explain_query_results(
