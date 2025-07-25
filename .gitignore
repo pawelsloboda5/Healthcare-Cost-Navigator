@@ -2,3 +2,5 @@
 /venv
 .Dockerfile
 .docker-compose.yml
+/data
+/data/medicare-data-raw.csv
