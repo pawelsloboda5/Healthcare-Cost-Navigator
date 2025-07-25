@@ -4,150 +4,443 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Healthcare Cost Navigator - AI Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        .content {
+            padding: 30px;
+        }
+        .section {
+            margin-bottom: 40px;
+            padding: 25px;
+            border: 1px solid #e0e6ed;
+            border-radius: 12px;
+            background: #f8f9fa;
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .section-icon {
+            font-size: 2em;
+            margin-right: 15px;
+        }
+        .section-title {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .form-col {
+            flex: 1;
+            min-width: 200px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            margin: 5px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: #545b62;
+            transform: translateY(-2px);
+        }
+        .btn-outline {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        .btn-outline:hover {
+            background: #667eea;
+            color: white;
+        }
+        .quick-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+        .example-links {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .example-links h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        .example-links ul {
+            list-style: none;
+        }
+        .example-links li {
+            margin-bottom: 10px;
+        }
+        .example-links a {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 12px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            display: block;
+        }
+        .example-links a:hover {
+            background: #e9ecef;
+        }
+        .results-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            border: 1px solid #dee2e6;
+        }
+        .results-header {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+            font-size: 1.1em;
+        }
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .footer p {
+            margin-bottom: 5px;
+            opacity: 0.9;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+        }
+        th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f8f9fa;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-success {
+            background-color: #28a745;
+        }
+        .status-warning {
+            background-color: #ffc107;
+        }
+        .status-error {
+            background-color: #dc3545;
+        }
+    </style>
 </head>
 <body>
-    <h1>Healthcare Cost Navigator</h1>
-    <p><strong>AI-Powered Hospital Search & Cost Analysis</strong></p>
-    
-    <!-- AI Assistant Section -->
-    <section>
-        <h2>🤖 AI Assistant - Natural Language Queries</h2>
-        <p>Ask questions in plain English about hospital costs, quality ratings, and procedures.</p>
-        
-        <div>
-            <textarea id="aiQuestion" rows="3" cols="80" placeholder="Ask me anything about healthcare costs... (e.g., 'Who has the cheapest hip replacement in NY?')"></textarea>
-            <br><br>
-            <button onclick="askAI()">Ask AI Assistant</button>
-            <button onclick="clearAIResults()">Clear</button>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Healthcare Cost Navigator</h1>
+            <p>AI-Powered Hospital Search & Cost Analysis Platform</p>
         </div>
-        
-        <div>
-            <h3>📋 Example Questions (Click to try):</h3>
-            <ul>
-                <li><a href="#" onclick="setQuestion('Who has the cheapest hip replacement in NY?')">Who has the cheapest hip replacement in NY?</a></li>
-                <li><a href="#" onclick="setQuestion('Find highest rated hospitals for heart surgery')">Find highest rated hospitals for heart surgery</a></li>
-                <li><a href="#" onclick="setQuestion('What are the most expensive procedures in California?')">What are the most expensive procedures in California?</a></li>
-                <li><a href="#" onclick="setQuestion('Show me volume leaders for DRG 470')">Show me volume leaders for DRG 470</a></li>
-                <li><a href="#" onclick="setQuestion('Compare costs for knee replacement between NY and TX')">Compare costs for knee replacement between NY and TX</a></li>
-                <li><a href="#" onclick="setQuestion('Which hospitals have ratings above 8 in Florida?')">Which hospitals have ratings above 8 in Florida?</a></li>
-            </ul>
-        </div>
-        
-        <div id="aiResults">
-            <h3>AI Response:</h3>
-            <div id="aiAnswer"></div>
-            <div id="aiDetails"></div>
-        </div>
-    </section>
 
-    <hr>
+        <div class="content">
+            <!-- AI Assistant Section -->
+            <section class="section">
+                <div class="section-header">
+                    <span class="section-icon">🤖</span>
+                    <div>
+                        <h2 class="section-title">AI Assistant - Natural Language Queries</h2>
+                        <p style="margin: 0; color: #6c757d;">Ask questions in plain English about hospital costs, quality ratings, and procedures</p>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="aiQuestion">Your Question:</label>
+                    <textarea id="aiQuestion" rows="3" placeholder="Ask me anything about healthcare costs... (e.g., 'Who has the cheapest hip replacement in NY?')"></textarea>
+                </div>
+                
+                <div class="quick-actions">
+                    <button class="btn btn-primary" onclick="askAI()">Ask AI Assistant</button>
+                    <button class="btn btn-secondary" onclick="clearAIResults()">Clear Results</button>
+                </div>
+                
+                <div class="example-links">
+                    <h3>📋 Example Questions (Click to try):</h3>
+                    <ul>
+                        <li><a href="#" onclick="setQuestion('Who has the cheapest hip replacement in NY?')">Who has the cheapest hip replacement in NY?</a></li>
+                        <li><a href="#" onclick="setQuestion('Find highest rated hospitals for heart surgery')">Find highest rated hospitals for heart surgery</a></li>
+                        <li><a href="#" onclick="setQuestion('What are the most expensive procedures in California?')">What are the most expensive procedures in California?</a></li>
+                        <li><a href="#" onclick="setQuestion('Show me volume leaders for DRG 470')">Show me volume leaders for DRG 470</a></li>
+                        <li><a href="#" onclick="setQuestion('Compare costs for knee replacement between NY and TX')">Compare costs for knee replacement between NY and TX</a></li>
+                        <li><a href="#" onclick="setQuestion('Which hospitals have ratings above 8 in Florida?')">Which hospitals have ratings above 8 in Florida?</a></li>
+                    </ul>
+                </div>
+                
+                <div class="results-container" id="aiResults">
+                    <h3 class="results-header">AI Response:</h3>
+                    <div id="aiAnswer"></div>
+                    <div id="aiDetails"></div>
+                </div>
+            </section>
 
-    <!-- Provider Search Section -->
-    <section>
-        <h2>🏥 Provider Search</h2>
-        
-        <div>
-            <h3>Search by Criteria</h3>
-            <form onsubmit="searchProviders(event)">
-                <table border="1">
-                    <tr>
-                        <td><label>State:</label></td>
-                        <td><input type="text" id="searchState" placeholder="NY" maxlength="2"></td>
-                        <td><label>City:</label></td>
-                        <td><input type="text" id="searchCity" placeholder="New York"></td>
-                    </tr>
-                    <tr>
-                        <td><label>DRG Code:</label></td>
-                        <td><input type="text" id="searchDrg" placeholder="470"></td>
-                        <td><label>Min Rating:</label></td>
-                        <td><input type="number" id="searchRating" min="1" max="10" step="0.1" placeholder="8.0"></td>
-                    </tr>
-                    <tr>
-                        <td><label>Max Cost:</label></td>
-                        <td><input type="number" id="searchCost" placeholder="100000"></td>
-                        <td><label>Limit:</label></td>
-                        <td><input type="number" id="searchLimit" value="10" min="1" max="50"></td>
-                    </tr>
-                </table>
-                <br>
-                <button type="submit">Search Providers</button>
-                <button type="button" onclick="clearProviderSearch()">Clear</button>
-            </form>
+            <!-- Provider Search Section -->
+            <section class="section">
+                <div class="section-header">
+                    <span class="section-icon">🏥</span>
+                    <h2 class="section-title">Provider Search</h2>
+                </div>
+                
+                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 20px; color: #2c3e50;">Search by Criteria</h3>
+                    <form onsubmit="searchProviders(event)">
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label for="searchState">State:</label>
+                                <input type="text" id="searchState" placeholder="NY" maxlength="2">
+                            </div>
+                            <div class="form-col">
+                                <label for="searchCity">City:</label>
+                                <input type="text" id="searchCity" placeholder="New York">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label for="searchDrg">DRG Code:</label>
+                                <input type="text" id="searchDrg" placeholder="470">
+                            </div>
+                            <div class="form-col">
+                                <label for="searchRating">Minimum Rating:</label>
+                                <input type="number" id="searchRating" min="1" max="10" step="0.1" placeholder="8.0">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label for="searchCost">Maximum Cost:</label>
+                                <input type="number" id="searchCost" placeholder="100000">
+                            </div>
+                            <div class="form-col">
+                                <label for="searchLimit">Results Limit:</label>
+                                <input type="number" id="searchLimit" value="10" min="1" max="50">
+                            </div>
+                        </div>
+                        <div class="quick-actions">
+                            <button type="submit" class="btn btn-primary">Search Providers</button>
+                            <button type="button" class="btn btn-secondary" onclick="clearProviderSearch()">Clear Search</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="margin-bottom: 20px; color: #2c3e50;">Quick Searches</h3>
+                    <div class="quick-actions">
+                        <button class="btn btn-outline" onclick="getCheapestProviders('470')">Cheapest DRG 470 (Hip Replacement)</button>
+                        <button class="btn btn-outline" onclick="getCheapestProviders('191')">Cheapest DRG 191 (Heart Surgery)</button>
+                        <button class="btn btn-outline" onclick="getHighestRated()">Highest Rated Providers</button>
+                        <button class="btn btn-outline" onclick="getVolumeLeaders('470')">Volume Leaders DRG 470</button>
+                    </div>
+                </div>
+                
+                <div class="results-container" id="providerResults">
+                    <h3 class="results-header">Provider Results:</h3>
+                    <div id="providerList"></div>
+                </div>
+            </section>
+
+            <!-- Cost Analysis Section -->
+            <section class="section">
+                <div class="section-header">
+                    <span class="section-icon">💰</span>
+                    <h2 class="section-title">Cost Analysis</h2>
+                </div>
+                
+                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label for="analysisCode">DRG Code:</label>
+                            <input type="text" id="analysisCode" placeholder="470" maxlength="10">
+                        </div>
+                        <div class="form-col">
+                            <label for="analysisState">State (optional):</label>
+                            <input type="text" id="analysisState" placeholder="NY" maxlength="2">
+                        </div>
+                    </div>
+                    <div class="quick-actions">
+                        <button class="btn btn-primary" onclick="analyzeCosts()">Analyze Costs</button>
+                    </div>
+                </div>
+                
+                <div class="results-container" id="costAnalysis">
+                    <h3 class="results-header">Cost Analysis Results:</h3>
+                    <div id="costDetails"></div>
+                </div>
+            </section>
+
+            <!-- System Status -->
+            <section class="section">
+                <div class="section-header">
+                    <span class="section-icon">📊</span>
+                    <h2 class="section-title">System Status</h2>
+                </div>
+                
+                <div class="quick-actions">
+                    <button class="btn btn-outline" onclick="checkHealth()">
+                        <span class="status-indicator status-success"></span>Check API Health
+                    </button>
+                    <button class="btn btn-outline" onclick="getTemplateStats()">Template Statistics</button>
+                </div>
+                
+                <div class="results-container" id="systemStatus">
+                    <div id="healthStatus"></div>
+                    <div id="templateStats"></div>
+                </div>
+            </section>
+
+            <!-- Raw Data Viewer -->
+            <section class="section">
+                <div class="section-header">
+                    <span class="section-icon">🔍</span>
+                    <h2 class="section-title">Raw Data Viewer</h2>
+                </div>
+                
+                <p style="margin-bottom: 20px; color: #6c757d;">View raw JSON responses for debugging and analysis</p>
+                <button class="btn btn-secondary" onclick="toggleRawData()">Toggle Raw Data Display</button>
+                
+                <div id="rawDataContainer" style="display: none; margin-top: 20px;">
+                    <div class="results-container">
+                        <h3 class="results-header">Last API Response:</h3>
+                        <pre id="rawData" style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px;"></pre>
+                    </div>
+                </div>
+            </section>
         </div>
-        
-        <div>
-            <h3>Quick Searches</h3>
-            <button onclick="getCheapestProviders('470')">Cheapest DRG 470 (Hip Replacement)</button>
-            <button onclick="getCheapestProviders('191')">Cheapest DRG 191 (Heart Surgery)</button>
-            <button onclick="getHighestRated()">Highest Rated Providers</button>
-            <button onclick="getVolumeLeaders('470')">Volume Leaders DRG 470</button>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Healthcare Cost Navigator v2.0</strong> - AI-Powered Hospital Search Platform</p>
+            <p>Built with FastAPI, PostgreSQL, OpenAI GPT-4, and pgvector</p>
+            <p>Features: Natural Language Processing, Template Matching, Vector Search, DRG Lookup</p>
         </div>
-        
-        <div id="providerResults">
-            <h3>Provider Results:</h3>
-            <div id="providerList"></div>
-        </div>
-    </section>
-
-    <hr>
-
-    <!-- Cost Analysis Section -->
-    <section>
-        <h2>💰 Cost Analysis</h2>
-        <div>
-            <label>Analyze costs for DRG Code:</label>
-            <input type="text" id="analysisCode" placeholder="470" maxlength="10">
-            <label>State (optional):</label>
-            <input type="text" id="analysisState" placeholder="NY" maxlength="2">
-            <button onclick="analyzeCosts()">Analyze Costs</button>
-        </div>
-        
-        <div id="costAnalysis">
-            <h3>Cost Analysis Results:</h3>
-            <div id="costDetails"></div>
-        </div>
-    </section>
-
-    <hr>
-
-    <!-- System Status -->
-    <section>
-        <h2>📊 System Status</h2>
-        <button onclick="checkHealth()">Check API Health</button>
-        <button onclick="getTemplateStats()">Template Statistics</button>
-        
-        <div id="systemStatus">
-            <div id="healthStatus"></div>
-            <div id="templateStats"></div>
-        </div>
-    </section>
-
-    <hr>
-
-    <!-- Raw Data Viewer -->
-    <section>
-        <h2>🔍 Raw Data Viewer</h2>
-        <p>View raw JSON responses for debugging</p>
-        <button onclick="toggleRawData()">Toggle Raw Data Display</button>
-        
-        <div id="rawDataContainer" style="display: none;">
-            <h3>Last API Response:</h3>
-            <pre id="rawData"></pre>
-        </div>
-    </section>
-
-    <!-- Loading indicator -->
-    <div id="loading" style="display: none;">
-        <h3>⏳ Loading...</h3>
     </div>
 
-    <!-- Footer -->
-    <footer>
-        <hr>
-        <p><strong>Healthcare Cost Navigator v1.0</strong> - AI-Powered Hospital Search</p>
-        <p>Built with FastAPI, PostgreSQL, OpenAI GPT-4, and pgvector</p>
-        <p>Features: Natural Language Processing, Template Matching, Vector Search, DRG Lookup</p>
-    </footer>
+    <!-- Loading indicator -->
+    <div id="loading" class="loading" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000;">
+        <div style="text-align: center;">
+            <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <h3 style="margin-top: 15px; color: #667eea;">Loading...</h3>
+        </div>
+    </div>
+
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
 
     <script src="app.js"></script>
     <script src="ws.js"></script>

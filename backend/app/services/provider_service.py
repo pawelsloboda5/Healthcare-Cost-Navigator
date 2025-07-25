@@ -64,20 +64,51 @@ class ProviderService:
             List of provider dictionaries
         """
         try:
-            # Build dynamic query based on criteria
-            base_query = """
-                SELECT DISTINCT
-                    p.provider_id,
-                    p.provider_name,
-                    p.provider_city,
-                    p.provider_state,
-                    p.provider_zip_code,
-                    pr.overall_rating,
-                    pr.quality_rating,
-                    pr.safety_rating
-                FROM providers p
-                LEFT JOIN provider_ratings pr ON p.provider_id = pr.provider_id
-            """
+            # Build dynamic query that always includes aggregate cost/volume data
+            if criteria.drg_code:
+                # When DRG code is specified, return data for that specific procedure
+                base_query = """
+                    SELECT DISTINCT
+                        p.provider_id,
+                        p.provider_name,
+                        p.provider_city,
+                        p.provider_state,
+                        p.provider_zip_code,
+                        pr.overall_rating,
+                        pr.quality_rating,
+                        pr.safety_rating,
+                        pp.average_covered_charges,
+                        pp.average_total_payments,
+                        pp.average_medicare_payments,
+                        pp.total_discharges,
+                        d.drg_description,
+                        pp.drg_code
+                    FROM providers p
+                    LEFT JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                """
+            else:
+                # When no DRG code is specified, return aggregate data across all procedures
+                base_query = """
+                    SELECT 
+                        p.provider_id,
+                        p.provider_name,
+                        p.provider_city,
+                        p.provider_state,
+                        p.provider_zip_code,
+                        pr.overall_rating,
+                        pr.quality_rating,
+                        pr.safety_rating,
+                        AVG(pp.average_covered_charges) as average_covered_charges,
+                        AVG(pp.average_total_payments) as average_total_payments,
+                        AVG(pp.average_medicare_payments) as average_medicare_payments,
+                        SUM(pp.total_discharges) as total_discharges,
+                        COUNT(DISTINCT pp.drg_code) as procedure_count
+                    FROM providers p
+                    LEFT JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    LEFT JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                """
             
             where_conditions = []
             params = {}
@@ -97,26 +128,42 @@ class ProviderService:
             if criteria.min_rating:
                 where_conditions.append("pr.overall_rating >= :min_rating")
                 params["min_rating"] = criteria.min_rating
-            
-            # Add JOIN and conditions for DRG-specific criteria
-            if criteria.drg_code or criteria.max_cost or criteria.min_volume:
-                base_query += " JOIN provider_procedures pp ON p.provider_id = pp.provider_id"
                 
+            if criteria.drg_code:
+                where_conditions.append("pp.drg_code = :drg_code")
+                params["drg_code"] = criteria.drg_code
+                    
+            if criteria.max_cost:
                 if criteria.drg_code:
-                    where_conditions.append("pp.drg_code = :drg_code")
-                    params["drg_code"] = criteria.drg_code
-                    
-                if criteria.max_cost:
                     where_conditions.append("pp.average_covered_charges <= :max_cost")
-                    params["max_cost"] = criteria.max_cost
+                else:
+                    # For aggregate search, filter on average of averages
+                    where_conditions.append("pp.average_covered_charges <= :max_cost")
+                params["max_cost"] = criteria.max_cost
                     
-                if criteria.min_volume:
+            if criteria.min_volume:
+                if criteria.drg_code:
                     where_conditions.append("pp.total_discharges >= :min_volume")
-                    params["min_volume"] = criteria.min_volume
+                else:
+                    # For aggregate search, we'll filter this in HAVING clause
+                    pass
             
             # Add WHERE clause if conditions exist
             if where_conditions:
                 base_query += " WHERE " + " AND ".join(where_conditions)
+            
+            # Add GROUP BY for aggregate queries
+            if not criteria.drg_code:
+                base_query += """
+                    GROUP BY p.provider_id, p.provider_name, p.provider_city, 
+                             p.provider_state, p.provider_zip_code, pr.overall_rating, 
+                             pr.quality_rating, pr.safety_rating
+                """
+                
+                # Add HAVING clause for min_volume in aggregate search
+                if criteria.min_volume:
+                    base_query += f" HAVING SUM(pp.total_discharges) >= :min_volume"
+                    params["min_volume"] = criteria.min_volume
             
             base_query += f" ORDER BY pr.overall_rating DESC NULLS LAST LIMIT :limit"
             params["limit"] = limit
@@ -135,6 +182,31 @@ class ProviderService:
                     "quality_rating": float(row.quality_rating) if row.quality_rating else None,
                     "safety_rating": float(row.safety_rating) if row.safety_rating else None
                 }
+                
+                # Add cost and volume data if available
+                if hasattr(row, 'average_covered_charges') and row.average_covered_charges is not None:
+                    provider["average_covered_charges"] = float(row.average_covered_charges)
+                
+                if hasattr(row, 'average_total_payments') and row.average_total_payments is not None:
+                    provider["average_total_payments"] = float(row.average_total_payments)
+                    
+                if hasattr(row, 'average_medicare_payments') and row.average_medicare_payments is not None:
+                    provider["average_medicare_payments"] = float(row.average_medicare_payments)
+                    
+                if hasattr(row, 'total_discharges') and row.total_discharges is not None:
+                    provider["total_discharges"] = int(row.total_discharges)
+                
+                # Add DRG-specific data if searching for specific procedure
+                if criteria.drg_code:
+                    if hasattr(row, 'drg_description') and row.drg_description:
+                        provider["drg_description"] = row.drg_description
+                    if hasattr(row, 'drg_code') and row.drg_code:
+                        provider["drg_code"] = row.drg_code
+                else:
+                    # For aggregate search, add procedure count
+                    if hasattr(row, 'procedure_count') and row.procedure_count is not None:
+                        provider["procedure_count"] = int(row.procedure_count)
+                
                 providers.append(provider)
             
             logger.info(f"Found {len(providers)} providers matching criteria")
@@ -176,7 +248,9 @@ class ProviderService:
                     pp.average_medicare_payments,
                     pp.total_discharges,
                     pr.overall_rating,
-                    d.drg_description
+                    pr.quality_rating,
+                    d.drg_description,
+                    pp.drg_code
                 FROM providers p
                 JOIN provider_procedures pp ON p.provider_id = pp.provider_id
                 JOIN drg_procedures d ON pp.drg_code = d.drg_code
@@ -208,7 +282,9 @@ class ProviderService:
                     "average_medicare_payments": float(row.average_medicare_payments),
                     "total_discharges": int(row.total_discharges),
                     "overall_rating": float(row.overall_rating) if row.overall_rating else None,
-                    "drg_description": row.drg_description
+                    "quality_rating": float(row.quality_rating) if row.quality_rating else None,
+                    "drg_description": row.drg_description,
+                    "drg_code": row.drg_code
                 }
                 providers.append(provider)
             
@@ -227,7 +303,7 @@ class ProviderService:
         limit: int = 10
     ) -> List[Dict]:
         """
-        Find highest rated providers in a geographic area
+        Find highest rated providers in a geographic area with aggregate cost and volume data
         
         Args:
             session: Database session
@@ -236,7 +312,7 @@ class ProviderService:
             limit: Number of results to return
             
         Returns:
-            List of highest rated providers
+            List of highest rated providers with cost and volume information
         """
         try:
             query = """
@@ -249,9 +325,15 @@ class ProviderService:
                     pr.overall_rating,
                     pr.quality_rating,
                     pr.safety_rating,
-                    pr.patient_experience_rating
+                    pr.patient_experience_rating,
+                    AVG(pp.average_covered_charges) as average_covered_charges,
+                    AVG(pp.average_total_payments) as average_total_payments,
+                    AVG(pp.average_medicare_payments) as average_medicare_payments,
+                    SUM(pp.total_discharges) as total_discharges,
+                    COUNT(DISTINCT pp.drg_code) as procedure_count
                 FROM providers p
                 JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                LEFT JOIN provider_procedures pp ON p.provider_id = pp.provider_id
                 WHERE pr.overall_rating IS NOT NULL
             """
             
@@ -265,7 +347,13 @@ class ProviderService:
                 query += " AND p.provider_city ILIKE :city"
                 params["city"] = f"%{city}%"
             
-            query += " ORDER BY pr.overall_rating DESC LIMIT :limit"
+            query += """
+                GROUP BY p.provider_id, p.provider_name, p.provider_city, 
+                         p.provider_state, p.provider_zip_code, pr.overall_rating, 
+                         pr.quality_rating, pr.safety_rating, pr.patient_experience_rating
+                ORDER BY pr.overall_rating DESC 
+                LIMIT :limit
+            """
             params["limit"] = limit
             
             result = await session.execute(text(query), params)
@@ -283,6 +371,23 @@ class ProviderService:
                     "safety_rating": float(row.safety_rating) if row.safety_rating else None,
                     "patient_experience_rating": float(row.patient_experience_rating) if row.patient_experience_rating else None
                 }
+                
+                # Add aggregate cost and volume data
+                if row.average_covered_charges is not None:
+                    provider["average_covered_charges"] = float(row.average_covered_charges)
+                    
+                if row.average_total_payments is not None:
+                    provider["average_total_payments"] = float(row.average_total_payments)
+                    
+                if row.average_medicare_payments is not None:
+                    provider["average_medicare_payments"] = float(row.average_medicare_payments)
+                    
+                if row.total_discharges is not None:
+                    provider["total_discharges"] = int(row.total_discharges)
+                    
+                if row.procedure_count is not None:
+                    provider["procedure_count"] = int(row.procedure_count)
+                
                 providers.append(provider)
             
             logger.info(f"Found {len(providers)} highest rated providers")
@@ -465,10 +570,15 @@ class ProviderService:
                     p.provider_name,
                     p.provider_city,
                     p.provider_state,
+                    p.provider_zip_code,
                     pp.total_discharges,
                     pp.average_covered_charges,
+                    pp.average_total_payments,
+                    pp.average_medicare_payments,
                     pr.overall_rating,
-                    d.drg_description
+                    pr.quality_rating,
+                    d.drg_description,
+                    pp.drg_code
                 FROM providers p
                 JOIN provider_procedures pp ON p.provider_id = pp.provider_id
                 JOIN drg_procedures d ON pp.drg_code = d.drg_code
@@ -487,10 +597,15 @@ class ProviderService:
                     "provider_name": row.provider_name,
                     "provider_city": row.provider_city,
                     "provider_state": row.provider_state,
+                    "provider_zip_code": row.provider_zip_code,
                     "total_discharges": int(row.total_discharges),
                     "average_covered_charges": float(row.average_covered_charges),
+                    "average_total_payments": float(row.average_total_payments) if row.average_total_payments else None,
+                    "average_medicare_payments": float(row.average_medicare_payments) if row.average_medicare_payments else None,
                     "overall_rating": float(row.overall_rating) if row.overall_rating else None,
-                    "drg_description": row.drg_description
+                    "quality_rating": float(row.quality_rating) if row.quality_rating else None,
+                    "drg_description": row.drg_description,
+                    "drg_code": row.drg_code
                 }
                 providers.append(provider)
             

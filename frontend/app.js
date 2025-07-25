@@ -235,85 +235,108 @@ function displayProviderResults(providers, title) {
 }
 
 function createProviderTable(providers) {
-    let html = '<table border="1" width="100%" cellpadding="8" cellspacing="0">';
-    html += '<tr style="background-color: #f0f0f0;">';
-    html += '<th style="text-align: left; padding: 8px;">Provider Name</th>';
-    html += '<th style="text-align: left; padding: 8px;">Procedure</th>';
-    html += '<th style="text-align: left; padding: 8px;">Location</th>';
-    html += '<th style="text-align: left; padding: 8px;">Cost</th>';
-    html += '<th style="text-align: left; padding: 8px;">Volume</th>';
-    html += '<th style="text-align: left; padding: 8px;">Rating</th>';
+    let html = '<div style="overflow-x: auto;">';
+    html += '<table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">';
+    html += '<thead>';
+    html += '<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">';
+    html += '<th style="text-align: left; padding: 15px; font-weight: 600;">Provider Name</th>';
+    html += '<th style="text-align: left; padding: 15px; font-weight: 600;">Procedure</th>';
+    html += '<th style="text-align: left; padding: 15px; font-weight: 600;">Location</th>';
+    html += '<th style="text-align: left; padding: 15px; font-weight: 600;">Cost</th>';
+    html += '<th style="text-align: center; padding: 15px; font-weight: 600;">Volume</th>';
+    html += '<th style="text-align: center; padding: 15px; font-weight: 600;">Rating</th>';
     html += '</tr>';
+    html += '</thead>';
+    html += '<tbody>';
 
     providers.forEach((provider, index) => {
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
-        html += `<tr style="background-color: ${bgColor};">`;
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+        html += `<tr style="background-color: ${bgColor}; transition: background-color 0.3s ease;" onmouseover="this.style.backgroundColor='#e9ecef'" onmouseout="this.style.backgroundColor='${bgColor}'">`;
         
         // Provider Name
-        html += `<td style="padding: 8px; font-weight: bold; vertical-align: top;">`;
-        html += `${provider.provider_name}`;
+        html += `<td style="padding: 15px; font-weight: 600; vertical-align: top; border-bottom: 1px solid #dee2e6;">`;
+        html += `<div style="color: #2c3e50;">${provider.provider_name}</div>`;
         if (provider.provider_id) {
-            html += `<br><small style="color: #666; font-weight: normal;">ID: ${provider.provider_id}</small>`;
+            html += `<small style="color: #6c757d; font-weight: normal;">ID: ${provider.provider_id}</small>`;
         }
         html += '</td>';
         
         // Procedure Information
-        html += `<td style="padding: 8px; vertical-align: top; max-width: 200px;">`;
+        html += `<td style="padding: 15px; vertical-align: top; max-width: 250px; border-bottom: 1px solid #dee2e6;">`;
         if (provider.drg_code && provider.drg_description) {
-            html += `<strong>DRG ${provider.drg_code}</strong><br>`;
+            html += `<div style="font-weight: 600; color: #495057; margin-bottom: 5px;">DRG ${provider.drg_code}</div>`;
             let description = provider.drg_description;
-            if (description.length > 40) {
-                description = description.substring(0, 40) + '...';
+            if (description.length > 50) {
+                description = description.substring(0, 50) + '...';
             }
-            html += `<small style="font-style: italic;">${description}</small>`;
+            html += `<small style="color: #6c757d; font-style: italic;">${description}</small>`;
         } else if (provider.drg_code) {
-            html += `DRG ${provider.drg_code}`;
+            html += `<span style="font-weight: 600; color: #495057;">DRG ${provider.drg_code}</span>`;
+        } else if (provider.procedure_count) {
+            // Show aggregate data info
+            html += `<div style="font-weight: 600; color: #495057; margin-bottom: 5px;">All Procedures</div>`;
+            html += `<small style="color: #6c757d; font-style: italic;">${provider.procedure_count} different procedures</small>`;
         } else {
-            html += '<span style="color: #888; font-style: italic;">N/A</span>';
+            html += '<span style="color: #adb5bd; font-style: italic;">N/A</span>';
         }
         html += '</td>';
         
         // Location
-        html += `<td style="padding: 8px; vertical-align: top;">`;
-        html += `${provider.provider_city}, ${provider.provider_state}`;
+        html += `<td style="padding: 15px; vertical-align: top; border-bottom: 1px solid #dee2e6;">`;
+        html += `<div style="font-weight: 600; color: #495057;">${provider.provider_city}, ${provider.provider_state}</div>`;
         if (provider.provider_zip_code) {
-            html += `<br><small style="color: #666;">${provider.provider_zip_code}</small>`;
+            html += `<small style="color: #6c757d;">${provider.provider_zip_code}</small>`;
         }
         html += '</td>';
         
         // Cost
-        html += `<td style="padding: 8px; text-align: right; font-weight: bold; vertical-align: top;">`;
+        html += `<td style="padding: 15px; text-align: right; vertical-align: top; border-bottom: 1px solid #dee2e6;">`;
         if (provider.average_covered_charges) {
-            html += `${formatCurrency(provider.average_covered_charges)}`;
+            const costLabel = provider.drg_code ? 'Procedure Cost:' : 'Avg Cost:';
+            html += `<div style="font-weight: 700; color: #28a745; font-size: 1.1em;">${formatCurrency(provider.average_covered_charges)}</div>`;
             if (provider.average_medicare_payments) {
-                html += `<br><small style="color: #666; font-weight: normal;">Medicare: ${formatCurrency(provider.average_medicare_payments)}</small>`;
+                html += `<small style="color: #6c757d;">Medicare: ${formatCurrency(provider.average_medicare_payments)}</small>`;
+            }
+            if (!provider.drg_code && provider.procedure_count) {
+                html += `<br><small style="color: #6c757d; font-style: italic;">Across ${provider.procedure_count} procedures</small>`;
             }
         } else {
-            html += '<span style="color: #888; font-style: italic;">N/A</span>';
+            html += '<span style="color: #adb5bd; font-style: italic;">N/A</span>';
         }
         html += '</td>';
         
         // Volume
-        html += `<td style="padding: 8px; text-align: center; vertical-align: top;">`;
-        html += provider.total_discharges || '<span style="color: #888; font-style: italic;">N/A</span>';
+        html += `<td style="padding: 15px; text-align: center; vertical-align: top; border-bottom: 1px solid #dee2e6;">`;
+        if (provider.total_discharges) {
+            html += `<span style="font-weight: 600; color: #495057;">${provider.total_discharges}</span>`;
+            if (!provider.drg_code && provider.procedure_count) {
+                html += `<br><small style="color: #6c757d; font-style: italic;">Total across all</small>`;
+            }
+        } else {
+            html += '<span style="color: #adb5bd; font-style: italic;">N/A</span>';
+        }
         html += '</td>';
         
         // Rating
-        html += `<td style="padding: 8px; text-align: center; vertical-align: top;">`;
+        html += `<td style="padding: 15px; text-align: center; vertical-align: top; border-bottom: 1px solid #dee2e6;">`;
         if (provider.overall_rating) {
-            html += `${formatRating(provider.overall_rating)}`;
+            const rating = parseFloat(provider.overall_rating);
+            const ratingColor = rating >= 8 ? '#28a745' : rating >= 6 ? '#ffc107' : '#dc3545';
+            html += `<div style="font-weight: 700; color: ${ratingColor}; font-size: 1.1em;">${formatRating(provider.overall_rating)}</div>`;
             if (provider.quality_rating) {
-                html += `<br><small style="color: #666;">Quality: ${formatRating(provider.quality_rating)}</small>`;
+                html += `<small style="color: #6c757d;">Quality: ${formatRating(provider.quality_rating)}</small>`;
             }
         } else {
-            html += '<span style="color: #888; font-style: italic;">N/A</span>';
+            html += '<span style="color: #adb5bd; font-style: italic;">N/A</span>';
         }
         html += '</td>';
         
         html += '</tr>';
     });
 
+    html += '</tbody>';
     html += '</table>';
+    html += '</div>';
     return html;
 }
 
@@ -362,38 +385,65 @@ function displayCostAnalysis(analysis) {
     const detailsDiv = document.getElementById('costDetails');
     
     if (!analysis || analysis.error) {
-        detailsDiv.innerHTML = `<p>Error: ${analysis?.detail || 'Cost analysis failed'}</p>`;
+        detailsDiv.innerHTML = `<div style="text-align: center; padding: 20px; color: #dc3545;">Error: ${analysis?.detail || 'Cost analysis failed'}</div>`;
         return;
     }
 
-    let html = `<h4>Cost Analysis for DRG ${analysis.drg_code}</h4>`;
+    let html = `<div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #dee2e6;">`;
+    html += `<h4 style="color: #2c3e50; margin-bottom: 20px; font-size: 1.3em;">Cost Analysis for DRG ${analysis.drg_code}</h4>`;
     
     if (analysis.drg_description) {
-        html += `<p><strong>Procedure:</strong> ${analysis.drg_description}</p>`;
+        html += `<p style="color: #6c757d; font-style: italic; margin-bottom: 25px;"><strong>Procedure:</strong> ${analysis.drg_description}</p>`;
     }
     
-    html += '<table border="1" width="100%">';
-    html += '<tr><th>Metric</th><th>Value</th></tr>';
-    html += `<tr><td>Average Cost</td><td>${formatCurrency(analysis.average_cost)}</td></tr>`;
-    html += `<tr><td>Median Cost</td><td>${formatCurrency(analysis.median_cost)}</td></tr>`;
-    html += `<tr><td>Cost Variance</td><td>${formatCurrency(analysis.cost_variance)}</td></tr>`;
-    html += `<tr><td>Total Providers</td><td>${analysis.total_providers}</td></tr>`;
+    html += '<div style="overflow-x: auto;">';
+    html += '<table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">';
+    html += '<thead>';
+    html += '<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">';
+    html += '<th style="text-align: left; padding: 15px; font-weight: 600;">Metric</th>';
+    html += '<th style="text-align: right; padding: 15px; font-weight: 600;">Value</th>';
+    html += '</tr>';
+    html += '</thead>';
+    html += '<tbody>';
+    
+    const metrics = [
+        { label: 'Average Cost', value: formatCurrency(analysis.average_cost), color: '#495057' },
+        { label: 'Median Cost', value: formatCurrency(analysis.median_cost), color: '#495057' },
+        { label: 'Cost Variance', value: formatCurrency(analysis.cost_variance), color: '#6c757d' },
+        { label: 'Total Providers', value: analysis.total_providers, color: '#495057' }
+    ];
+    
+    metrics.forEach((metric, index) => {
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+        html += `<tr style="background-color: ${bgColor};">`;
+        html += `<td style="padding: 15px; font-weight: 600; color: #2c3e50; border-bottom: 1px solid #dee2e6;">${metric.label}</td>`;
+        html += `<td style="padding: 15px; text-align: right; font-weight: 700; color: ${metric.color}; font-size: 1.1em; border-bottom: 1px solid #dee2e6;">${metric.value}</td>`;
+        html += '</tr>';
+    });
+    
+    html += '</tbody>';
     html += '</table>';
+    html += '</div>';
 
     if (analysis.cheapest_provider) {
-        html += '<h5>Cheapest Provider:</h5>';
-        html += `<p><strong>${analysis.cheapest_provider.provider_name}</strong><br>`;
+        html += '<div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">';
+        html += '<h5 style="color: #155724; margin-bottom: 10px;">💰 Cheapest Provider:</h5>';
+        html += `<p style="color: #155724; margin: 0;"><strong>${analysis.cheapest_provider.provider_name}</strong><br>`;
         html += `${analysis.cheapest_provider.provider_city}, ${analysis.cheapest_provider.provider_state}<br>`;
-        html += `Cost: ${formatCurrency(analysis.cheapest_provider.average_covered_charges)}</p>`;
+        html += `<span style="font-weight: 700; font-size: 1.1em;">Cost: ${formatCurrency(analysis.cheapest_provider.cost)}</span></p>`;
+        html += '</div>';
     }
 
     if (analysis.most_expensive_provider) {
-        html += '<h5>Most Expensive Provider:</h5>';
-        html += `<p><strong>${analysis.most_expensive_provider.provider_name}</strong><br>`;
+        html += '<div style="background: #f8d7da; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc3545;">';
+        html += '<h5 style="color: #721c24; margin-bottom: 10px;">💸 Most Expensive Provider:</h5>';
+        html += `<p style="color: #721c24; margin: 0;"><strong>${analysis.most_expensive_provider.provider_name}</strong><br>`;
         html += `${analysis.most_expensive_provider.provider_city}, ${analysis.most_expensive_provider.provider_state}<br>`;
-        html += `Cost: ${formatCurrency(analysis.most_expensive_provider.average_covered_charges)}</p>`;
+        html += `<span style="font-weight: 700; font-size: 1.1em;">Cost: ${formatCurrency(analysis.most_expensive_provider.cost)}</span></p>`;
+        html += '</div>';
     }
 
+    html += '</div>';
     detailsDiv.innerHTML = html;
 }
 
@@ -451,7 +501,7 @@ async function getTemplateStats() {
 
 function createResultsTable(results) {
     if (!results || results.length === 0) {
-        return '<p>No results found.</p>';
+        return '<div style="text-align: center; padding: 20px; color: #6c757d; font-style: italic;">No results found.</div>';
     }
 
     // Define preferred column order for better readability
@@ -474,10 +524,12 @@ function createResultsTable(results) {
     const orderedKeys = columnOrder.filter(key => availableKeys.includes(key))
                                   .concat(availableKeys.filter(key => !columnOrder.includes(key)));
     
-    let html = '<table border="1" width="100%" cellpadding="8" cellspacing="0">';
+    let html = '<div style="overflow-x: auto;">';
+    html += '<table style="width: 100%; border-collapse: collapse; margin: 20px 0; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">';
     
     // Header with better formatting
-    html += '<tr style="background-color: #f0f0f0;">';
+    html += '<thead>';
+    html += '<tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">';
     orderedKeys.forEach(key => {
         let headerName = key.replace(/_/g, ' ').toUpperCase();
         
@@ -489,39 +541,48 @@ function createResultsTable(results) {
         if (key === 'total_discharges') headerName = 'VOLUME';
         if (key === 'overall_rating') headerName = 'RATING';
         
-        html += `<th style="text-align: left; padding: 8px;">${headerName}</th>`;
+        const textAlign = (key.includes('charge') || key.includes('payment') || key.includes('cost')) ? 'right' : 
+                         (key.includes('rating') || key === 'total_discharges') ? 'center' : 'left';
+        
+        html += `<th style="text-align: ${textAlign}; padding: 15px; font-weight: 600;">${headerName}</th>`;
     });
     html += '</tr>';
+    html += '</thead>';
     
     // Data rows with enhanced formatting
+    html += '<tbody>';
     results.forEach((row, index) => {
-        const bgColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
-        html += `<tr style="background-color: ${bgColor};">`;
+        const bgColor = index % 2 === 0 ? '#ffffff' : '#f8f9fa';
+        html += `<tr style="background-color: ${bgColor}; transition: background-color 0.3s ease;" onmouseover="this.style.backgroundColor='#e9ecef'" onmouseout="this.style.backgroundColor='${bgColor}'">`;
         
         orderedKeys.forEach(key => {
             let value = row[key];
-            let cellStyle = 'padding: 8px; vertical-align: top;';
+            let cellStyle = 'padding: 15px; vertical-align: top; border-bottom: 1px solid #dee2e6;';
             
             // Format specific columns
             if (key.includes('charge') || key.includes('payment') || key.includes('cost')) {
                 value = formatCurrency(value);
-                cellStyle += ' text-align: right; font-weight: bold;';
+                cellStyle += ' text-align: right; font-weight: 700; color: #28a745; font-size: 1.1em;';
             } else if (key.includes('rating')) {
+                const rating = parseFloat(value);
+                const ratingColor = rating >= 8 ? '#28a745' : rating >= 6 ? '#ffc107' : '#dc3545';
                 value = formatRating(value);
-                cellStyle += ' text-align: center;';
+                cellStyle += ` text-align: center; font-weight: 700; color: ${ratingColor}; font-size: 1.1em;`;
             } else if (key === 'drg_description') {
                 // Special formatting for procedure descriptions
-                cellStyle += ' font-style: italic; max-width: 200px;';
-                if (value && value.length > 50) {
-                    value = value.substring(0, 50) + '...';
+                cellStyle += ' font-style: italic; max-width: 250px; color: #495057;';
+                if (value && value.length > 60) {
+                    value = value.substring(0, 60) + '...';
                 }
             } else if (key === 'provider_name') {
-                cellStyle += ' font-weight: bold;';
+                cellStyle += ' font-weight: 600; color: #2c3e50;';
             } else if (key === 'total_discharges') {
-                cellStyle += ' text-align: center;';
+                cellStyle += ' text-align: center; font-weight: 600; color: #495057;';
             } else if (value === null || value === undefined) {
                 value = 'N/A';
-                cellStyle += ' color: #888; font-style: italic;';
+                cellStyle += ' color: #adb5bd; font-style: italic;';
+            } else {
+                cellStyle += ' color: #495057;';
             }
             
             html += `<td style="${cellStyle}">${value}</td>`;
@@ -529,7 +590,9 @@ function createResultsTable(results) {
         html += '</tr>';
     });
     
+    html += '</tbody>';
     html += '</table>';
+    html += '</div>';
     return html;
 }
 
