@@ -1,8 +1,8 @@
-version: '3.8'
-
 services:
   postgres:
-    image: postgis/postgis:17-3.5
+    build:
+      context: .
+      dockerfile: db.Dockerfile
     container_name: healthcare_postgres
     environment:
       POSTGRES_USER: postgres
@@ -12,19 +12,21 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./etl/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d healthcare_cost_navigator"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+
   api:
     build: .
     container_name: healthcare_api
+    env_file:
+      - .env           
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:Warmia50587@postgres:5432/healthcare_cost_navigator
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
     ports:
       - "8000:8000"
     depends_on:
@@ -32,6 +34,7 @@ services:
         condition: service_healthy
     volumes:
       - ./data:/app/data
+      - ./app:/app/app
     restart: unless-stopped
 
 volumes:

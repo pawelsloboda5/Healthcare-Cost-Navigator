@@ -90,8 +90,13 @@ def build_radius_query(zip_code: str, radius_km: float):
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
+    """Root endpoint"""
     return {"message": "Healthcare Cost Navigator API", "status": "healthy"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": "Healthcare Cost Navigator API"}
 
 @app.get("/providers", response_model=List[ProviderResponse])
 async def search_providers(

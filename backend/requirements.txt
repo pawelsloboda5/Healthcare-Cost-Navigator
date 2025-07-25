@@ -11,6 +11,7 @@ alembic==1.13.1               # migrations
 # --- geospatial goodies ---
 GeoAlchemy2==0.18.0           # SQLAlchemy ↔ PostGIS types
 shapely==2.1.1                # helper maths if you need it
+requests==2.32.3
 
 # --- data wrangling & ETL ---
 pandas==2.2.2
@@ -28,6 +29,13 @@ pydantic==2.11.0             # prompt-output validation
 sse-starlette==0.6.1          # Server-Sent Events (EventSourceResponse)
 prometheus-client==0.20.0     # /metrics endpoint
 
+# --- SQL processing & safety ---
+sqlglot==25.32.0              # SQL parsing, normalization, and validation
+python-Levenshtein==0.25.0    # Edit distance calculations for template matching
+pglast==6.8                   # PostgreSQL query parser (alternative/backup)
+pgvector==0.3.6               # pgvector SQLAlchemy support
+
 # --- testing ---
 pytest==8.4.0
 pytest-asyncio==1.0.0
+

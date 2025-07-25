@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Index, Text
+from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Index, Text, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from geoalchemy2 import Geometry
+from pgvector.sqlalchemy import Vector
 from ..core.database import Base
 
 class Provider(Base):
@@ -109,4 +111,27 @@ class CSVColumnMapping(Base):
     __table_args__ = (
         Index('idx_csv_column', 'csv_column_name'),
         Index('idx_normalized_field', 'normalized_field_name'),
+    )
+
+
+class TemplateCatalog(Base):
+    """
+    SQL Template Catalog for vector-based template matching and RAG
+    Based on Template_Catalog_Vector_Search.md
+    """
+    __tablename__ = "template_catalog"
+    
+    template_id = Column(Integer, primary_key=True, autoincrement=True)
+    canonical_sql = Column(Text, nullable=False)  # Normalized SQL with placeholders
+    raw_sql = Column(Text, nullable=False)        # Original SQL template
+    embedding = Column(Vector(1536))              # OpenAI text-embedding-3-small vector
+    comment = Column(Text)                        # Human-readable description
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Indexes for efficient searches
+    __table_args__ = (
+        Index('idx_template_canonical', 'canonical_sql'),
+        Index('idx_template_created', 'created_at'),
+        # Vector index will be created separately after data load
     ) 

@@ -26,10 +26,6 @@ Describe how the SQL template catalog evolves over time based on free-form queri
 
 ---
 
-## Example
-**Repeated Free-form Queries:**
-"Cheapest DRG 470 in NY"
-"Cheapest DRG 291 in NY"
-→ New Template:
-SELECT ... WHERE ms_drg = $1 AND state = $2 ORDER BY avg_covered_charges ASC LIMIT 1;
+
+
 
