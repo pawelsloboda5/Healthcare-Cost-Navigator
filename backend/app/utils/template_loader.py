@@ -228,7 +228,7 @@ class TemplateService:
             logger.info(f"Template execution successful - Template ID: {template_match.template_id}, "
                        f"Results: {len(results)}")
             
-            return True, f"Query executed successfully, returned {len(results)} results", results
+            return True, executable_sql, results
             
         except Exception as e:
             logger.error(f"Template execution failed: {e}")
