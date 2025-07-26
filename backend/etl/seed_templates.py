@@ -66,13 +66,21 @@ class TemplateSeeder:
         """
         Use SQLGlot to pretty-print / canonicalise the query,
         then replace literals with numbered placeholders ($1, $2, …).
+        Preserves existing parameter placeholders.
         """
         try:
             # 1. Parse & pretty-print
             parsed = sqlglot.parse_one(sql, dialect=sqlglot.dialects.Postgres)
             normalized = parsed.sql(dialect=sqlglot.dialects.Postgres, pretty=True)
 
-            # 2. Parameterise (simple regex fallback)
+            # 2. Check if template already has parameters - if so, preserve them
+            import re
+            existing_params = re.findall(r'\$\d+', normalized)
+            if existing_params:
+                # Template already parameterized, just normalize formatting
+                return normalized.lower().strip()
+
+            # 3. Parameterise only if no existing parameters (simple regex fallback)
             param_counter = 1
 
             def repl_string(match):

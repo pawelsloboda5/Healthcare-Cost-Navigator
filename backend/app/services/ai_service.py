@@ -215,7 +215,7 @@ class EnhancedAIService:
             
             # Check context around the parameter to determine what it represents
             if f"d.drg_description ilike {param_placeholder}" in tmpl:
-                # This is a procedure description parameter
+                # This is a procedure description parameter - return clean value for ILIKE mapping
                 procedure_term = structured_params.procedure or ""
                 drg_code = await drg_code_from_phrase(session, procedure_term)
                 if drg_code:
@@ -227,14 +227,18 @@ class EnhancedAIService:
                         )
                         row = result.fetchone()
                         if row:
-                            constants.append(f"%{row.drg_description}%")
+                            # Return clean DRG description - template mapping will add wildcards
+                            constants.append(row.drg_description)
                         else:
-                            constants.append(f"%{procedure_term}%")
+                            # Return clean procedure term - template mapping will add wildcards  
+                            constants.append(procedure_term)
                     except Exception as e:
                         logger.warning(f"Failed to get DRG description for {drg_code}: {e}")
-                        constants.append(f"%{procedure_term}%")
+                        # Return clean procedure term - template mapping will add wildcards
+                        constants.append(procedure_term)
                 else:
-                    constants.append(f"%{procedure_term}%")
+                    # Return clean procedure term - template mapping will add wildcards
+                    constants.append(procedure_term)
                     
             elif f"d.drg_code = {param_placeholder}" in tmpl:
                 # This is a DRG code parameter
@@ -256,12 +260,12 @@ class EnhancedAIService:
                 constants.append(state_value)
                 
             elif f"provider_city ilike {param_placeholder}" in tmpl or f"p.provider_city ilike {param_placeholder}" in tmpl:
-                # This is a city parameter
-                constants.append(f"%{structured_params.city or ''}%")
+                # This is a city parameter - return clean value for ILIKE mapping
+                constants.append(structured_params.city or "")
                 
             elif f"provider_zip_code like {param_placeholder}" in tmpl:
-                # This is a ZIP code parameter
-                constants.append(f"{structured_params.zip_code or ''}%")
+                # This is a ZIP code parameter - return clean value for LIKE mapping
+                constants.append(structured_params.zip_code or "")
                 
             elif f"limit {param_placeholder}" in tmpl:
                 # This is a limit parameter
@@ -276,9 +280,9 @@ class EnhancedAIService:
                 logger.warning(f"Could not determine parameter type for ${param_num} in template")
                 # Default fallback based on common patterns
                 if param_num == 1 and "drg_description" in tmpl:
-                    # Likely procedure description
+                    # Likely procedure description - return clean value for ILIKE mapping
                     procedure_term = structured_params.procedure or ""
-                    constants.append(f"%{procedure_term}%")
+                    constants.append(procedure_term)
                 elif param_num == 2 and "limit" in tmpl and "provider_state" not in tmpl:
                     # Likely limit for nationwide query
                     constants.append(str(structured_params.limit or 10))
