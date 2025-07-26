@@ -30,44 +30,93 @@ Ask _“Who has the cheapest hip-replacement near Los Angeles?”_ or _“Show t
 
 ---
 
-## High-level architecture
+## High-level Architecture
 
-┌───────────────────────────────────────  Client / Browser  ────────────────────────────────────────┐
-│  index.html + app.js                                                                             │
-│  ├─ Search box & results grid                                                                    │
-│                                                                            
+### Overview
+
+The system is composed of a browser-based client, an API gateway, a FastAPI backend with AI and template services, and a PostgreSQL database with PostGIS and pgvector extensions.
+
+---
+
+### Architecture Diagram
+
+┌─────────────────────────────────────── Client / Browser ────────────────────────────────────────┐
+│ index.html + app.js │
+│ ├─ Search box & results grid │
 └──────────────▲────────────────────────────────────────────────────▲───────────────────────────────┘
-               │ SSE (EventSource)  –or–  WebSocket  ◀── continuous token push                      │
-               │ REST (JSON)  ◀── CRUD endpoints                                                    │
+│ SSE (EventSource) – or – WebSocket ◀── continuous token push
+│ REST (JSON) ◀── CRUD endpoints
 ┌──────────────┴────────────────────────────────────────────────────┴───────────────────────────────┐
-│                                     API Gateway / Edge (Caddy)                                    │
-│  • TLS termination                                                                                 │
-│  • Path routing →  /api → FastAPI&nbsp;&nbsp;•&nbsp;/docs → ReDoc&nbsp;&nbsp;•&nbsp;/metrics → Prom│
+│ API Gateway / Edge (Caddy) │
+│ • TLS termination │
+│ • Path routing → /api → FastAPI • /docs → ReDoc • /metrics → Prom │
 └──────────────▲────────────────────────────────────────────────────▲───────────────────────────────┘
-               │ internal HTTP/2                                                                       
+│ internal HTTP/2
 ┌──────────────┴────────────────────────────────────────────────────┴───────────────────────────────┐
-│                            FastAPI 0.112  (Uvicorn workers, async)                                 │
-│                                                                                                   │
-│  ┌────────  AI Service  ────────┐   ┌────────  Template Loader  ────────┐                         │
-│  │ • GPT-4o “NL → Structured”  │   │ • SQLGlot canonicaliser          │                         │
-│  │ • DRG & template embeddings │   │ • pgvector cosine reuse          │                         │
-│  │ • Streams OpenAI chunks → WS│   │ • Read-only SQL safety gate      │                         │
-│  └─────────────────────────────┘   └───────────────────────────────────┘                         │
-│  • Provider Service / DRG Lookup (geo + pg_trgm + pgvector)                                       │
-│  • Metrics → Prometheus  `/metrics`                                                                │
-│  • Background tasks (Celery async – nightly re-embedding, VACUUM, etc.)                           │
+│ FastAPI 0.112 (Uvicorn workers, async) │
+│ │
+│ ┌──────── AI Service ────────┐ ┌──────── Template Loader ────────┐ │
+│ │ • GPT-4o “NL → Structured” │ │ • SQLGlot canonicaliser │ │
+│ │ • DRG & template embeddings │ │ • pgvector cosine reuse │ │
+│ │ • Streams OpenAI chunks → WS│ │ • Read-only SQL safety gate │ │
+│ └─────────────────────────────┘ └───────────────────────────────────┘ │
+│ • Provider Service / DRG Lookup (geo + pg_trgm + pgvector) │
+│ • Metrics → Prometheus /metrics │
+│ • Background tasks (Celery async – nightly re-embedding, VACUUM, etc.) │
 └──────────────▲────────────────────────────────────────────────────▲───────────────────────────────┘
-               │ asyncpg pool                               │ SQLAlchemy (async)                    
+│ asyncpg pool │ SQLAlchemy (async)
 ┌──────────────┴────────────────────────────────────────────────────┴───────────────────────────────┐
-│                        PostgreSQL 15   +   PostGIS 3   +   pgvector 0.6                           │
-│                                                                                                   │
-│  • providers  (≈ 13 k)          – GiST spatial idx on (lon, lat)                                  │
-│  • drg_procedures (533)         – 768-D `text-embedding-3-small`; IVFFlat idx (lists = 100)       │
-│  • provider_procedures (2.7 M)  – btree on (drg_code, provider_id)                                │
-│  • template_catalog             – canonical_sql + 768-D vector + IVFFlat idx (lists = 100)        │
-│  • Logical replica slot         → Prometheus `pg_exporter`                                        │
+│ PostgreSQL 15 + PostGIS 3 + pgvector 0.6 │
+│ │
+│ • providers (≈ 13 k) – GiST spatial idx on (lon, lat) │
+│ • drg_procedures (533) – 768-D text-embedding-3-small; IVFFlat idx (lists = 100) │
+│ • provider_procedures (2.7 M) – btree on (drg_code, provider_id) │
+│ • template_catalog – canonical_sql + 768-D vector + IVFFlat idx (lists = 100) │
+│ • Logical replica slot → Prometheus pg_exporter │
 └────────────────────────────────────────────────────────────────────────────────────────────────────┘
 
+
+---
+
+### Key Components
+
+#### **Client / Browser**
+- `index.html` + `app.js`
+- Search box & results grid
+- Communicates with the backend via:
+  - **SSE (EventSource)** or **WebSocket** for continuous token streaming
+  - **REST (JSON)** for CRUD endpoints
+
+#### **API Gateway / Edge (Caddy)**
+- **TLS termination**
+- **Path routing:**
+  - `/api` → FastAPI
+  - `/docs` → ReDoc
+  - `/metrics` → Prometheus
+
+#### **FastAPI (v0.112, async with Uvicorn workers)**
+- **AI Service:**
+  - GPT-4o: "Natural Language → Structured Data"
+  - DRG & template embeddings
+  - Streams OpenAI chunks via WebSocket
+- **Template Loader:**
+  - SQLGlot canonicalizer
+  - pgvector cosine reuse
+  - Read-only SQL safety gate
+- **Provider Service / DRG Lookup:** Uses geo + `pg_trgm` + `pgvector`
+- **Metrics:** Exposed to Prometheus at `/metrics`
+- **Background tasks:** Celery for nightly re-embedding, database maintenance (VACUUM, etc.)
+
+#### **Database Layer**
+- **PostgreSQL 15** + **PostGIS 3** + **pgvector 0.6**
+- **Tables:**
+  - `providers` (~13k) – GiST spatial index on `(lon, lat)`
+  - `drg_procedures` (533) – 768-D embeddings (`text-embedding-3-small`), IVFFlat index (lists = 100)
+  - `provider_procedures` (2.7M) – B-tree on `(drg_code, provider_id)`
+  - `template_catalog` – canonical SQL + 768-D vectors + IVFFlat index (lists = 100)
+- **Metrics:** Logical replica slot → Prometheus `pg_exporter`
+
+---
 
 
 ### Data-flow (“happy path”)
