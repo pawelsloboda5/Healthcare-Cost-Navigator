@@ -14,10 +14,34 @@ import openai
 import sqlglot
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+from dotenv import load_dotenv
+
+# ─── Load environment variables ---------------------------------------------
+env_path = Path(__file__).parent.parent / ".env"
+print(f"Loading .env from: {env_path}")
+load_dotenv(env_path)
+
+# ─── Check environment variables ---------------------------------------------
+database_url = os.getenv('DATABASE_URL')
+openai_api_key = os.getenv('OPENAI_API_KEY')
+
+print(f"DATABASE_URL: {'SET' if database_url else 'NOT SET'}")
+print(f"OPENAI_API_KEY: {'SET' if openai_api_key else 'NOT SET'}")
+
+if not database_url:
+    print("ERROR: DATABASE_URL environment variable is not set!")
+    print("Please create a .env file in the backend directory with:")
+    print("DATABASE_URL=postgresql+asyncpg://postgres:Warmia50587@localhost:5432/healthcare_cost_navigator")
+    sys.exit(1)
+
+if not openai_api_key:
+    print("ERROR: OPENAI_API_KEY environment variable is not set!")
+    print("Please add your OpenAI API key to the .env file")
+    sys.exit(1)
 
 # ─── App imports -------------------------------------------------------------
-app_dir = Path(__file__).parent.parent / "app"
-sys.path.insert(0, str(app_dir))
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
 
 from app.core.database import AsyncSessionLocal, init_db
 from app.models.models import TemplateCatalog
@@ -91,10 +115,13 @@ class TemplateSeeder:
     # ────────────────────────────────────────────────────────────────────
     def get_initial_templates(self) -> list[dict]:
         """
-        Initial catalogue based on PLAN.md & common healthcare queries.
+        Comprehensive catalogue covering all common healthcare query patterns.
         Each entry gets normalised + embedded before insertion.
         """
         return [
+            # ═══════════════════════════════════════════════════════════════
+            # CHEAPEST PROVIDERS - Core patterns
+            # ═══════════════════════════════════════════════════════════════
             {
                 "raw_sql": """
                     SELECT p.provider_name,
@@ -104,73 +131,143 @@ class TemplateSeeder:
                            p.provider_state
                     FROM providers p
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
-                    JOIN drg_procedures d       ON pp.drg_code    = d.drg_code
-                    WHERE d.drg_code = $1
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
                       AND p.provider_state = $2
-                    ORDER BY pp.average_covered_charges
+                    ORDER BY pp.average_covered_charges ASC
                     LIMIT $3;
                 """,
-                "comment": "Find cheapest providers for a DRG in a state",
+                "comment": "Cheapest providers for a procedure by description in a state",
             },
             {
                 "raw_sql": """
                     SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_code = $1
+                      AND p.provider_state = $2
+                    ORDER BY pp.average_covered_charges ASC
+                    LIMIT $3;
+                """,
+                "comment": "Cheapest providers for a DRG in a state",
+            },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state,
+                           pp.total_discharges
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                    ORDER BY pp.average_covered_charges ASC
+                    LIMIT $2;
+                """,
+                "comment": "Cheapest providers nationwide for any procedure by description",
+            },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_city ILIKE $2
+                    ORDER BY pp.average_covered_charges ASC
+                    LIMIT $3;
+                """,
+                "comment": "Cheapest providers for a procedure in a city",
+            },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # MOST EXPENSIVE PROVIDERS - Missing pattern
+            # ═══════════════════════════════════════════════════════════════
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_state = $2
+                    ORDER BY pp.average_covered_charges DESC
+                    LIMIT $3;
+                """,
+                "comment": "Most expensive providers for a procedure by description in a state",
+            },
+            {
+                "raw_sql": """
+                    SELECT d.drg_code,
+                           d.drg_description,
+                           AVG(pp.average_covered_charges) AS avg_cost,
+                           MAX(pp.average_covered_charges) AS max_cost,
+                           COUNT(*) AS provider_count
+                    FROM drg_procedures d
+                    JOIN provider_procedures pp ON d.drg_code = pp.drg_code
+                    JOIN providers p ON pp.provider_id = p.provider_id
+                    WHERE p.provider_state = $1
+                    GROUP BY d.drg_code, d.drg_description
+                    ORDER BY avg_cost DESC
+                    LIMIT $2;
+                """,
+                "comment": "Most expensive procedures in a state by average cost",
+            },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # HIGHEST RATED PROVIDERS - Enhanced patterns
+            # ═══════════════════════════════════════════════════════════════
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
                            pr.overall_rating,
+                           pr.quality_rating,
+                           pr.safety_rating,
                            p.provider_city,
                            p.provider_state
                     FROM providers p
                     JOIN provider_ratings pr ON p.provider_id = pr.provider_id
-                    WHERE p.provider_city ILIKE $1
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
                     ORDER BY pr.overall_rating DESC
                     LIMIT $2;
                 """,
-                "comment": "Highest-rated providers in a city",
+                "comment": "Highest rated providers for a specific procedure",
             },
             {
                 "raw_sql": """
                     SELECT p.provider_name,
-                           p.provider_city,
-                           p.provider_state,
-                           p.provider_zip_code
-                    FROM providers p
-                    WHERE p.provider_zip_code LIKE $1
-                    LIMIT $2;
-                """,
-                "comment": "Providers near a ZIP-code prefix",
-            },
-            {
-                "raw_sql": """
-                    SELECT p.provider_name,
-                           pp.total_discharges,
-                           pp.average_covered_charges,
-                           d.drg_description
-                    FROM providers p
-                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
-                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
-                    WHERE pp.drg_code = $1
-                    ORDER BY pp.total_discharges DESC
-                    LIMIT $2;
-                """,
-                "comment": "High-volume providers for a procedure",
-            },
-            {
-                "raw_sql": """
-                    SELECT p.provider_name,
-                           pp.average_covered_charges,
-                           pp.average_total_payments,
                            pr.overall_rating,
+                           pr.quality_rating,
+                           pr.safety_rating,
                            p.provider_city,
                            p.provider_state
                     FROM providers p
+                    JOIN provider_ratings pr ON p.provider_id = pr.provider_id
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
-                    JOIN drg_procedures d       ON pp.drg_code    = d.drg_code
-                    LEFT JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
                     WHERE d.drg_description ILIKE $1
                       AND p.provider_state = $2
-                    ORDER BY pp.average_covered_charges
+                    ORDER BY pr.overall_rating DESC
                     LIMIT $3;
                 """,
-                "comment": "Providers by procedure description in a state",
+                "comment": "Highest rated providers for a procedure in a state",
             },
             {
                 "raw_sql": """
@@ -192,19 +289,160 @@ class TemplateSeeder:
             },
             {
                 "raw_sql": """
-                    SELECT d.drg_code,
-                           d.drg_description,
-                           COUNT(*)                        AS provider_count,
-                           AVG(pp.average_covered_charges) AS avg_cost
-                    FROM drg_procedures d
-                    JOIN provider_procedures pp ON d.drg_code = pp.drg_code
-                    JOIN providers p           ON pp.provider_id = p.provider_id
-                    WHERE p.provider_state = $1
-                    GROUP BY d.drg_code, d.drg_description
-                    ORDER BY avg_cost
+                    SELECT p.provider_name,
+                           pr.overall_rating,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    WHERE p.provider_city ILIKE $1
+                    ORDER BY pr.overall_rating DESC
                     LIMIT $2;
                 """,
-                "comment": "Most affordable procedures in a state",
+                "comment": "Highest-rated providers in a city",
+            },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # VOLUME LEADERS - Enhanced patterns
+            # ═══════════════════════════════════════════════════════════════
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.total_discharges,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE pp.drg_code = $1
+                    ORDER BY pp.total_discharges DESC
+                    LIMIT $2;
+                """,
+                "comment": "Volume leaders for a specific DRG code",
+            },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.total_discharges,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                    ORDER BY pp.total_discharges DESC
+                    LIMIT $2;
+                """,
+                "comment": "Volume leaders for a procedure by description",
+            },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.total_discharges,
+                           pp.average_covered_charges,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_state = $2
+                    ORDER BY pp.total_discharges DESC
+                    LIMIT $3;
+                """,
+                "comment": "Volume leaders for a procedure in a state",
+            },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # STATE COMPARISONS - New critical pattern
+            # ═══════════════════════════════════════════════════════════════
+            {
+                "raw_sql": """
+                    SELECT p.provider_state,
+                           AVG(pp.average_covered_charges) AS avg_cost,
+                           MIN(pp.average_covered_charges) AS min_cost,
+                           MAX(pp.average_covered_charges) AS max_cost,
+                           COUNT(*) AS provider_count
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_state IN ($2, $3)
+                    GROUP BY p.provider_state
+                    ORDER BY avg_cost ASC;
+                """,
+                "comment": "Compare costs for a procedure between two states",
+            },
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           p.provider_state,
+                           p.provider_city,
+                           d.drg_description
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_state IN ($2, $3)
+                    ORDER BY pp.average_covered_charges ASC
+                    LIMIT $4;
+                """,
+                "comment": "Cheapest providers for procedure across multiple states",
+            },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # COST-QUALITY BALANCE
+            # ═══════════════════════════════════════════════════════════════
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           pr.overall_rating,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state,
+                           (pp.average_covered_charges * 0.3 +
+                            (10 - pr.overall_rating) * 1000) AS cost_quality_score
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN provider_ratings pr    ON p.provider_id = pr.provider_id
+                    JOIN drg_procedures d       ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_state = $2
+                    ORDER BY cost_quality_score ASC
+                    LIMIT $3;
+                """,
+                "comment": "Best cost-quality balance for a procedure in a state",
+            },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # PATIENT OUT-OF-POCKET COSTS
+            # ═══════════════════════════════════════════════════════════════
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           pp.average_covered_charges,
+                           pp.average_medicare_payments,
+                           (pp.average_covered_charges - pp.average_medicare_payments)
+                               AS patient_cost,
+                           d.drg_description,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_state = $2
+                    ORDER BY patient_cost ASC
+                    LIMIT $3;
+                """,
+                "comment": "Lowest patient out-of-pocket costs for a procedure in a state",
             },
             {
                 "raw_sql": """
@@ -221,32 +459,48 @@ class TemplateSeeder:
                     JOIN drg_procedures d ON pp.drg_code = d.drg_code
                     WHERE pp.drg_code = $1
                       AND p.provider_zip_code LIKE $2
-                    ORDER BY patient_cost
+                    ORDER BY patient_cost ASC
                     LIMIT $3;
                 """,
-                "comment": "Lowest patient out-of-pocket providers for a procedure",
+                "comment": "Lowest patient out-of-pocket providers for a DRG near ZIP code",
+            },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # GEOGRAPHIC QUERIES
+            # ═══════════════════════════════════════════════════════════════
+            {
+                "raw_sql": """
+                    SELECT p.provider_name,
+                           p.provider_city,
+                           p.provider_state,
+                           p.provider_zip_code
+                    FROM providers p
+                    WHERE p.provider_zip_code LIKE $1
+                    LIMIT $2;
+                """,
+                "comment": "Providers near a ZIP-code prefix",
             },
             {
                 "raw_sql": """
                     SELECT p.provider_name,
                            pp.average_covered_charges,
-                           pr.overall_rating,
                            d.drg_description,
                            p.provider_city,
-                           p.provider_state,
-                           (pp.average_covered_charges * 0.3 +
-                            (10 - pr.overall_rating) * 1000) AS cost_quality_score
+                           p.provider_state
                     FROM providers p
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
-                    JOIN provider_ratings pr    ON p.provider_id = pr.provider_id
-                    JOIN drg_procedures d       ON pp.drg_code = d.drg_code
-                    WHERE pp.drg_code = $1
-                      AND p.provider_state = $2
-                    ORDER BY cost_quality_score
+                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND p.provider_zip_code LIKE $2
+                    ORDER BY pp.average_covered_charges ASC
                     LIMIT $3;
                 """,
-                "comment": "Best cost-quality balance for a procedure",
+                "comment": "Cheapest providers for procedure near ZIP code",
             },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # MULTI-PROCEDURE PROVIDERS
+            # ═══════════════════════════════════════════════════════════════
             {
                 "raw_sql": """
                     SELECT p.provider_name,
@@ -269,27 +523,35 @@ class TemplateSeeder:
             {
                 "raw_sql": """
                     SELECT p.provider_name,
-                           pp.average_covered_charges,
-                           d.drg_description,
+                           COUNT(DISTINCT pp.drg_code) AS procedure_count,
+                           AVG(pp.average_covered_charges) AS avg_cost,
+                           AVG(pr.overall_rating) AS avg_rating,
                            p.provider_city,
                            p.provider_state
                     FROM providers p
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
-                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
-                    WHERE d.drg_description ILIKE $1
-                      AND p.provider_state = $2
-                    ORDER BY pp.average_covered_charges ASC
+                    LEFT JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    WHERE p.provider_state = $1
+                    GROUP BY p.provider_id, p.provider_name,
+                             p.provider_city, p.provider_state
+                    HAVING COUNT(DISTINCT pp.drg_code) >= $2
+                    ORDER BY procedure_count DESC
                     LIMIT $3;
                 """,
-                "comment": "Cheapest providers for a procedure by description in a state",
+                "comment": "Multi-procedure providers in a state ranked by variety",
             },
+            
+            # ═══════════════════════════════════════════════════════════════
+            # AGGREGATED STATISTICS
+            # ═══════════════════════════════════════════════════════════════
             {
                 "raw_sql": """
                     SELECT d.drg_code,
                            d.drg_description,
                            COUNT(*) AS provider_count,
                            AVG(pp.average_covered_charges) AS avg_cost,
-                           MIN(pp.average_covered_charges) AS min_cost
+                           MIN(pp.average_covered_charges) AS min_cost,
+                           MAX(pp.average_covered_charges) AS max_cost
                     FROM drg_procedures d
                     JOIN provider_procedures pp ON d.drg_code = pp.drg_code
                     JOIN providers p ON pp.provider_id = p.provider_id
@@ -298,41 +560,23 @@ class TemplateSeeder:
                     ORDER BY avg_cost ASC
                     LIMIT $2;
                 """,
-                "comment": "Cheapest procedures in a state ordered by average cost",
+                "comment": "Most affordable procedures in a state with statistics",
             },
             {
                 "raw_sql": """
-                    SELECT p.provider_name,
-                           pp.average_covered_charges,
-                           pp.average_total_payments,
-                           d.drg_description,
-                           p.provider_city,
-                           p.provider_state
+                    SELECT p.provider_state,
+                           COUNT(DISTINCT p.provider_id) AS provider_count,
+                           COUNT(DISTINCT pp.drg_code) AS procedure_count,
+                           AVG(pp.average_covered_charges) AS avg_cost,
+                           AVG(pr.overall_rating) AS avg_rating
                     FROM providers p
                     JOIN provider_procedures pp ON p.provider_id = pp.provider_id
-                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
-                    WHERE d.drg_code = $1
-                    ORDER BY pp.average_covered_charges ASC
-                    LIMIT $2;
+                    LEFT JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    GROUP BY p.provider_state
+                    ORDER BY avg_cost ASC
+                    LIMIT $1;
                 """,
-                "comment": "Cheapest providers for a specific DRG procedure",
-            },
-            {
-                "raw_sql": """
-                    SELECT p.provider_name,
-                           pp.average_covered_charges,
-                           d.drg_description,
-                           p.provider_city,
-                           p.provider_state,
-                           pp.total_discharges
-                    FROM providers p
-                    JOIN provider_procedures pp ON p.provider_id = pp.provider_id
-                    JOIN drg_procedures d ON pp.drg_code = d.drg_code
-                    WHERE d.drg_description ILIKE $1
-                    ORDER BY pp.average_covered_charges ASC
-                    LIMIT $2;
-                """,
-                "comment": "Find cheapest providers for any procedure by description",
+                "comment": "State-level healthcare statistics ranked by cost",
             },
         ]
 
