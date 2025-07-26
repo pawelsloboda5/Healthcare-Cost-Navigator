@@ -728,6 +728,69 @@ class TemplateSeeder:
                 logger.error("Seeding failed: %s", exc)
                 raise
 
+    async def clean_template_catalog(self) -> None:
+        """Remove all templates and re-seed with only original templates"""
+        logger.info("Cleaning template catalog - removing all existing templates...")
+        await init_db()
+
+        async with AsyncSessionLocal() as session:
+            try:
+                # Get count before cleanup
+                result = await session.execute(text("SELECT COUNT(*) FROM template_catalog"))
+                before_count = result.scalar()
+                logger.info(f"Found {before_count} existing templates")
+                
+                # Delete all existing templates
+                await session.execute(text("DELETE FROM template_catalog"))
+                logger.info("Deleted all existing templates")
+                
+                # Re-seed with only original templates
+                templates = self.get_initial_templates()
+                
+                for idx, tpl in enumerate(templates, 1):
+                    logger.info("Processing template %d/%d", idx, len(templates))
+
+                    raw_sql = tpl["raw_sql"].strip()
+                    comment = tpl["comment"]
+
+                    canonical_sql = self.normalize_sql(raw_sql)
+                    embedding = await self.get_embedding(canonical_sql)
+
+                    if not embedding:
+                        logger.warning("Skipping template %d (embedding failed)", idx)
+                        continue
+
+                    session.add(
+                        TemplateCatalog(
+                            canonical_sql=canonical_sql,
+                            raw_sql=raw_sql,
+                            embedding=embedding,
+                            comment=comment,
+                        )
+                    )
+
+                await session.commit()
+                logger.info("Re-inserted %d original templates", len(templates))
+
+                # Recreate vector index
+                await session.execute(
+                    text(
+                        """
+                    CREATE INDEX IF NOT EXISTS idx_template_embedding
+                    ON template_catalog
+                    USING ivfflat (embedding vector_cosine_ops)
+                    WITH (lists = 100);
+                    """
+                    )
+                )
+                await session.commit()
+                logger.info("Vector similarity index recreated")
+
+            except Exception as exc:
+                await session.rollback()
+                logger.error("Template cleanup failed: %s", exc)
+                raise
+
 
 # ─── Entrypoint --------------------------------------------------------------
 async def main() -> None:
@@ -736,15 +799,18 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description="Seed template catalog and DRG embeddings")
     parser.add_argument(
         "--mode", 
-        choices=["templates", "drg-embeddings", "both"], 
+        choices=["templates", "drg-embeddings", "both", "clean"], 
         default="both",
-        help="What to populate: templates, drg-embeddings, or both (default: both)"
+        help="What to populate: templates, drg-embeddings, both, or clean (default: both)"
     )
     
     args = parser.parse_args()
     seeder = TemplateSeeder()
     
-    if args.mode in ["templates", "both"]:
+    if args.mode == "clean":
+        logger.info("Cleaning template catalog...")
+        await seeder.clean_template_catalog()
+    elif args.mode in ["templates", "both"]:
         logger.info("Seeding SQL templates...")
         await seeder.seed_templates()
     
@@ -752,7 +818,7 @@ async def main() -> None:
         logger.info("Populating DRG embeddings for semantic search...")
         await seeder.populate_drg_embeddings()
     
-    logger.info("Seeding complete!")
+    logger.info("Operation complete!")
 
 
 if __name__ == "__main__":

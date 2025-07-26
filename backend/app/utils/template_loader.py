@@ -34,7 +34,8 @@ class TemplateService:
         self,
         session: AsyncSession,
         sql_query: str,
-        confidence_threshold: float = 0.7
+        confidence_threshold: float = 0.7,
+        user_intent: str = ""
     ) -> Tuple[Optional[TemplateMatch], str, List[str]]:
         """
         Normalize SQL and search for matching templates
@@ -43,6 +44,7 @@ class TemplateService:
             session: Database session
             sql_query: Raw SQL query to normalize and search
             confidence_threshold: Minimum confidence for template match
+            user_intent: User's intent to help with template filtering
             
         Returns:
             Tuple of (best_match, normalized_sql, extracted_constants)
@@ -60,7 +62,8 @@ class TemplateService:
                 session=session,
                 normalized_sql=normalized_sql,
                 original_sql=sql_query,
-                confidence_threshold=confidence_threshold
+                confidence_threshold=confidence_threshold,
+                user_intent=user_intent
             )
             
             logger.info(f"Template search - Query: {sql_query[:100]}..., "

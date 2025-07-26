@@ -125,15 +125,17 @@ class VectorSearchEngine:
         session: AsyncSession,
         normalized_sql: str,
         original_sql: str,
+        user_intent: Optional[str] = None,
         confidence_threshold: float = 0.7
     ) -> Optional[TemplateMatch]:
         """
-        Find the best matching template with confidence scoring
+        Find the best matching template with confidence scoring and intent-aware selection
         
         Args:
             session: Database session
             normalized_sql: Normalized SQL for vector search
             original_sql: Original SQL for additional validation
+            user_intent: Intent keywords (e.g. "cheapest", "highest_rated", "expensive")
             confidence_threshold: Minimum confidence to return a match
             
         Returns:
@@ -144,14 +146,21 @@ class VectorSearchEngine:
             matches = await self.search_similar_templates(
                 session, 
                 normalized_sql, 
-                limit=3,
+                limit=20,  # Get more candidates for better selection
                 similarity_threshold=0.6
             )
             
             if not matches:
                 logger.info("No similar templates found")
                 return None
-                
+            
+            # Apply intent-based filtering to avoid wrong template selection
+            if user_intent:
+                filtered_matches = self._filter_by_intent(matches, user_intent)
+                if filtered_matches:
+                    matches = filtered_matches
+                    logger.info(f"Filtered {len(matches)} templates by intent: {user_intent}")
+                    
             best_match = matches[0]
             
             # Calculate edit distance for additional validation
@@ -183,6 +192,57 @@ class VectorSearchEngine:
             logger.error(f"Template matching failed for SQL: {normalized_sql}, error: {e}")
             await session.rollback()
             return None
+    
+    def _filter_by_intent(self, matches: List[TemplateMatch], user_intent: str) -> List[TemplateMatch]:
+        """Filter templates by user intent to avoid opposite templates (cheap vs expensive)"""
+        intent_keywords = {
+            "cheapest": ["cheapest", "cheapest_provider", "lowest", "affordable", "inexpensive"],
+            "expensive": ["expensive", "highest cost", "most expensive"],
+            "highest_rated": ["highest_rated", "highest rated", "best rated", "top rated"],
+            "nationwide": ["nationwide", "all states", "across states"],
+            "state_specific": ["in state", "state", "within"]
+        }
+        
+        # Check for specific intent patterns in the user intent
+        intent_lower = user_intent.lower()
+        
+        # Determine all applicable intent categories (not just first match)
+        applicable_intents = []
+        for category, keywords in intent_keywords.items():
+            if any(keyword in intent_lower for keyword in keywords):
+                applicable_intents.append(category)
+        
+        if not applicable_intents:
+            return matches
+        
+        filtered = []
+        for match in matches:
+            comment_lower = match.comment.lower()
+            should_exclude = False
+            
+            # Apply filtering logic based on applicable intents
+            if "cheapest" in applicable_intents:
+                # Exclude "expensive" templates
+                if any(word in comment_lower for word in intent_keywords["expensive"]):
+                    logger.info(f"Excluding expensive template {match.template_id}: {match.comment}")
+                    should_exclude = True
+                    
+            if "expensive" in applicable_intents:
+                # Exclude "cheapest" templates  
+                if any(word in comment_lower for word in intent_keywords["cheapest"]):
+                    logger.info(f"Excluding cheapest template {match.template_id}: {match.comment}")
+                    should_exclude = True
+                    
+            if "highest_rated" in applicable_intents and "nationwide" in applicable_intents:
+                # For nationwide highest rated queries, exclude state-specific templates
+                if "in a state" in comment_lower:
+                    logger.info(f"Excluding state-specific template {match.template_id} for nationwide query: {match.comment}")
+                    should_exclude = True
+            
+            if not should_exclude:
+                filtered.append(match)
+        
+        return filtered if filtered else matches  # Return original if no matches pass filter
     
     async def add_template_to_catalog(
         self,

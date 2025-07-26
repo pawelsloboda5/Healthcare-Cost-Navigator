@@ -134,42 +134,52 @@ class EnhancedAIService:
             if not search_sql:
                 return QueryResult(success=False, message="Failed to generate search SQL")
             
+            # Determine user intent for better template matching
+            user_intent = self._extract_user_intent(user_query, structured_params)
+            
             # Search for matching templates
             template_match, normalized_sql, constants = await self.template_service.normalize_and_search(
                 session=session,
                 sql_query=search_sql,
+                user_intent=user_intent,
                 confidence_threshold=0.7
             )
             
-            if template_match:
-                # Use structured parameters to create proper constants for template
-                template_constants = await self._extract_template_constants(
-                    session, structured_params, template_match.raw_sql)
-                if not template_constants:
-                    # We couldn't supply the required parameters – fall back to RAG
-                    return QueryResult(success=False, message="Template not applicable")
-                
-                # Execute the matched template
-                success, message, results = await self.template_service.validate_and_execute_template(
-                    session=session,
-                    template_match=template_match,
-                    user_constants=template_constants
-                )
-                
+            if not template_match:
+                return QueryResult(success=False, message="No matching template found")
+            
+            # Extract constants for the matched template
+            template_constants = await self._extract_template_constants(
+                session, structured_params, template_match.raw_sql
+            )
+            
+            if not template_constants:
+                return QueryResult(success=False, message="Failed to extract template parameters")
+            
+            # Execute the template with extracted constants
+            success, final_sql, results = await self.template_service.validate_and_execute_template(
+                session=session,
+                template_match=template_match,
+                user_constants=template_constants,
+                max_results=structured_params.limit or 100
+            )
+            
+            if success and results:
                 return QueryResult(
-                    success=success,
-                    message=f"Template match found. {message}",
-                    sql_query=template_match.raw_sql,
+                    success=True,
                     results=results,
+                    sql_query=final_sql,
                     template_used=template_match.template_id,
+                    message=f"Template match found. Query executed successfully, returned {len(results)} results",
                     confidence_score=template_match.similarity_score
                 )
-            
-            return QueryResult(success=False, message="No confident template match found")
-            
+            else:
+                return QueryResult(success=False, message="Template execution failed")
+                
         except Exception as e:
             logger.error(f"Structured template matching failed: {e}")
-            return QueryResult(success=False, message="Template matching failed")
+            await session.rollback()
+            return QueryResult(success=False, message=f"Template matching error: {str(e)}")
     
     async def _extract_template_constants(
         self,
@@ -184,55 +194,111 @@ class EnhancedAIService:
         constants: list[str] = []
 
         tmpl = template_sql.lower()
+        
+        # Count total parameters in template to ensure correct parameter count
+        import re
+        param_count = len(re.findall(r'\$\d+', tmpl))
+        logger.info(f"Template expects {param_count} parameters")
 
-        # --- 1. procedure or DRG --------------------------------------
-        if "d.drg_code =" in tmpl:
-            # template wants a numeric code
-            code = (structured_params.drg_code or
-                    await drg_code_from_phrase(session, structured_params.procedure or ""))
-            if not code:
-                # we can't satisfy this template – let the caller know
-                return []
-            constants.append(code)
-
-        elif "d.drg_description" in tmpl:
-            # For description matching, use semantic lookup to find the best DRG
-            procedure_term = structured_params.procedure or ""
+        # Extract parameters in the order they appear in the template
+        # Find all $1, $2, $3, etc. and determine what each represents
+        
+        param_positions = []
+        for i in range(1, param_count + 1):
+            param_placeholder = f"${i}"
+            if param_placeholder in tmpl:
+                param_positions.append(i)
+        
+        # Now extract constants for each parameter position
+        for param_num in sorted(param_positions):
+            param_placeholder = f"${param_num}"
             
-            # Try to find the best matching DRG via semantic search
-            drg_code = await drg_code_from_phrase(session, procedure_term)
-            if drg_code:
-                # Get the actual DRG description for exact matching
-                try:
-                    from sqlalchemy import text
-                    result = await session.execute(
-                        text("SELECT drg_description FROM drg_procedures WHERE drg_code = :code"),
-                        {"code": drg_code}
-                    )
-                    row = result.fetchone()
-                    if row:
-                        # Use the actual medical DRG description for better matching
-                        constants.append(f"%{row.drg_description}%")
-                    else:
+            # Check context around the parameter to determine what it represents
+            if f"d.drg_description ilike {param_placeholder}" in tmpl:
+                # This is a procedure description parameter
+                procedure_term = structured_params.procedure or ""
+                drg_code = await drg_code_from_phrase(session, procedure_term)
+                if drg_code:
+                    try:
+                        from sqlalchemy import text
+                        result = await session.execute(
+                            text("SELECT drg_description FROM drg_procedures WHERE drg_code = :code"),
+                            {"code": drg_code}
+                        )
+                        row = result.fetchone()
+                        if row:
+                            constants.append(f"%{row.drg_description}%")
+                        else:
+                            constants.append(f"%{procedure_term}%")
+                    except Exception as e:
+                        logger.warning(f"Failed to get DRG description for {drg_code}: {e}")
                         constants.append(f"%{procedure_term}%")
-                except Exception as e:
-                    logger.warning(f"Failed to get DRG description for {drg_code}: {e}")
+                else:
                     constants.append(f"%{procedure_term}%")
+                    
+            elif f"d.drg_code = {param_placeholder}" in tmpl:
+                # This is a DRG code parameter
+                code = (structured_params.drg_code or
+                        await drg_code_from_phrase(session, structured_params.procedure or ""))
+                if not code:
+                    logger.warning("Template requires DRG code but none available")
+                    return []
+                constants.append(code)
+                
+            elif f"provider_state = {param_placeholder}" in tmpl or f"p.provider_state = {param_placeholder}" in tmpl:
+                # This is a state parameter
+                state_value = structured_params.state or ""
+                if not state_value:
+                    # Check if template comment suggests it's state-specific
+                    if "in a state" in template_sql.lower():
+                        logger.warning(f"Template requires state parameter but none provided")
+                        return []
+                constants.append(state_value)
+                
+            elif f"provider_city ilike {param_placeholder}" in tmpl or f"p.provider_city ilike {param_placeholder}" in tmpl:
+                # This is a city parameter
+                constants.append(f"%{structured_params.city or ''}%")
+                
+            elif f"provider_zip_code like {param_placeholder}" in tmpl:
+                # This is a ZIP code parameter
+                constants.append(f"{structured_params.zip_code or ''}%")
+                
+            elif f"limit {param_placeholder}" in tmpl:
+                # This is a limit parameter
+                constants.append(str(structured_params.limit or 10))
+                
+            elif f"overall_rating >= {param_placeholder}" in tmpl:
+                # This is a minimum rating parameter
+                constants.append(str(structured_params.min_rating or 1))
+                
             else:
-                # No semantic match found, use original term
-                constants.append(f"%{procedure_term}%")
+                # Try to infer from position and template structure
+                logger.warning(f"Could not determine parameter type for ${param_num} in template")
+                # Default fallback based on common patterns
+                if param_num == 1 and "drg_description" in tmpl:
+                    # Likely procedure description
+                    procedure_term = structured_params.procedure or ""
+                    constants.append(f"%{procedure_term}%")
+                elif param_num == 2 and "limit" in tmpl and "provider_state" not in tmpl:
+                    # Likely limit for nationwide query
+                    constants.append(str(structured_params.limit or 10))
+                elif param_num == 2 and "provider_state" in tmpl:
+                    # Likely state parameter
+                    constants.append(structured_params.state or "")
+                elif param_num == 3 and "limit" in tmpl:
+                    # Likely limit
+                    constants.append(str(structured_params.limit or 10))
+                else:
+                    logger.error(f"Cannot determine parameter ${param_num} - template extraction failed")
+                    return []
 
-        # --- 2. geography ---------------------------------------------
-        if "provider_state" in tmpl:
-            constants.append(structured_params.state or "")
-        if "provider_city"  in tmpl and "provider_city ilike" in tmpl:
-            constants.append(f"%{structured_params.city or ''}%")
-
-        # --- 3. LIMIT --------------------------------------------------
-        if "$3" in tmpl or "limit $" in tmpl:
-            constants.append(str(structured_params.limit or 10))
-
-        logger.info("Extracted template constants: %s", constants)
+        logger.info(f"Extracted {len(constants)} template constants: {constants}")
+        
+        # Verify we have the right number of parameters
+        if len(constants) != param_count:
+            logger.error(f"Parameter count mismatch: template expects {param_count}, extracted {len(constants)}")
+            return []
+            
         return constants
     
     async def _generate_structured_sql(self, structured_params: StructuredQuery) -> Optional[str]:
@@ -567,3 +633,33 @@ class EnhancedAIService:
         except Exception as e:
             logger.error(f"Result explanation failed: {e}")
             return "Query executed successfully but explanation generation failed."
+
+    def _extract_user_intent(self, user_query: str, structured_params: StructuredQuery) -> str:
+        """Extract user intent keywords to help with template matching"""
+        intent_parts = []
+        
+        # Add query type intent
+        if structured_params.query_type == QueryType.CHEAPEST_PROVIDER:
+            intent_parts.append("cheapest")
+        elif structured_params.query_type == QueryType.HIGHEST_RATED:
+            intent_parts.append("highest_rated")
+            # Check if nationwide vs state-specific
+            if not structured_params.state:
+                intent_parts.append("nationwide")
+        
+        # Add geographic scope
+        if structured_params.state:
+            intent_parts.append("state_specific")
+        elif not structured_params.city and not structured_params.zip_code:
+            intent_parts.append("nationwide")
+            
+        # Add query-specific keywords from original text
+        query_lower = user_query.lower()
+        if any(word in query_lower for word in ["cheap", "cheapest", "lowest", "affordable"]):
+            intent_parts.append("cheapest")
+        if any(word in query_lower for word in ["expensive", "highest cost", "most expensive"]):
+            intent_parts.append("expensive")
+        if any(word in query_lower for word in ["best", "highest rated", "top rated"]):
+            intent_parts.append("highest_rated")
+            
+        return " ".join(intent_parts)
