@@ -22,9 +22,9 @@ Ask _“Who has the cheapest hip-replacement near Los Angeles?”_ or _“Show t
 | **Natural-language search** | Patients & analysts can use plain English; no one has to learn DRG codes or SQL. |
 | **True cost transparency** | Pulls *average covered charge, Medicare payment, discharges* for every DRG at ~3 k hospitals. |
 | **Quality + cost in one place** | Merges CMS star-ratings so you can weigh price *and* quality. |
-| **Geospatial radius queries** | “Within 25 mi of 94107” powered by PostGIS & spatial indexes. |
+| **Geospatial radius queries** | “Within 25 mi of 94107” powered by PostGIS & spatial indexes. | **Needs zip code feature only city/state  right now
 | **Semantic template matching** | Hundreds of pre-embedded SQL templates delivered in < 3 ms via pgvector. |
-| **Realtime streaming answers** | SSE / WebSocket streams tokens as soon as GPT-4 generates them—no spinning wheels. |
+| **Realtime streaming answers** | SSE / WebSocket streams tokens as soon as GPT-4 generates them—no spinning wheels. | **Not Done
 | **Safety-first SQL pipeline** | Every AI-generated query is normalised, linted, and cosine-matched against trusted templates before execution. |
 | **One-command deploy** | `docker compose up --build` gives you a ready-to-use API with demo data & docs. |
 
