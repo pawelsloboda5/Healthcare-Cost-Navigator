@@ -1,341 +1,448 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Healthcare Cost Navigator - AI Assistant</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.6;
-            color: #333;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-            overflow: hidden;
-        }
-        .header {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-        .header p {
-            font-size: 1.2em;
-            opacity: 0.9;
-        }
-        .content {
-            padding: 30px;
-        }
-        .section {
-            margin-bottom: 40px;
-            padding: 25px;
-            border: 1px solid #e0e6ed;
-            border-radius: 12px;
-            background: #f8f9fa;
-        }
-        .section-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 2px solid #e9ecef;
-        }
-        .section-icon {
-            font-size: 2em;
-            margin-right: 15px;
-        }
-        .section-title {
-            font-size: 1.5em;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .form-group {
-            margin-bottom: 20px;
-        }
-        .form-row {
-            display: flex;
-            gap: 20px;
-            margin-bottom: 15px;
-            flex-wrap: wrap;
-        }
-        .form-col {
-            flex: 1;
-            min-width: 200px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            color: #495057;
-        }
-        input, textarea, select {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #dee2e6;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s ease;
-        }
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-        }
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-            margin: 5px;
-        }
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
-        }
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        .btn-secondary:hover {
-            background: #545b62;
-            transform: translateY(-2px);
-        }
-        .btn-outline {
-            background: white;
-            color: #667eea;
-            border: 2px solid #667eea;
-        }
-        .btn-outline:hover {
-            background: #667eea;
-            color: white;
-        }
-        .quick-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin: 20px 0;
-        }
-        .example-links {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin: 20px 0;
-        }
-        .example-links h3 {
-            color: #2c3e50;
-            margin-bottom: 15px;
-        }
-        .example-links ul {
-            list-style: none;
-        }
-        .example-links li {
-            margin-bottom: 10px;
-        }
-        .example-links a {
-            color: #667eea;
-            text-decoration: none;
-            padding: 8px 12px;
-            border-radius: 5px;
-            transition: background-color 0.3s ease;
-            display: block;
-        }
-        .example-links a:hover {
-            background: #e9ecef;
-        }
-        .results-container {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-top: 20px;
-            border: 1px solid #dee2e6;
-        }
-        .results-header {
-            font-size: 1.2em;
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #e9ecef;
-        }
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #667eea;
-            font-size: 1.1em;
-        }
-        .footer {
-            background: #2c3e50;
-            color: white;
-            padding: 30px;
-            text-align: center;
-        }
-        .footer p {
-            margin-bottom: 5px;
-            opacity: 0.9;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 20px 0;
-            background: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        }
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #dee2e6;
-        }
-        th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            font-weight: 600;
-        }
-        tr:hover {
-            background-color: #f8f9fa;
-        }
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-        }
-        .status-success {
-            background-color: #28a745;
-        }
-        .status-warning {
-            background-color: #ffc107;
-        }
-        .status-error {
-            background-color: #dc3545;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <h1>Healthcare Cost Navigator</h1>
-            <p>AI-Powered Hospital Search & Cost Analysis Platform</p>
-        </div>
+<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Healthcare Cost Navigator - AI Assistant</title> <meta name="color-scheme" content="light dark"> <style> :root { --bg: #0f172a; /* slate-900 */ --panel: #0b1220; /* deep panel */ --surface: #121a2b; /* subtle surface */ --muted: #93a4c4; /* desaturated text */ --text: #e6ecff; /* bright text */ --primary: #7c8cfb; /* periwinkle */ --primary-2: #a772ff; /* accent blend */ --accent: #2dd4bf; /* teal accent */ --border: #1f2a44; /* border color */ --success: #22c55e; --warn: #fbbf24; --danger: #ef4444; --card-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03); --glow: 0 0 0 rgba(124,140,251,0); /* animated on focus */ }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
 
-        <div class="content">
-            <!-- AI Assistant Section -->
-            <section class="section">
-                <div class="section-header">
-                    <span class="section-icon">🤖</span>
-                    <div>
-                        <h2 class="section-title">AI Assistant - Natural Language Queries</h2>
-                        <p style="margin: 0; color: #6c757d;">Ask questions in plain English about hospital costs, quality ratings, and procedures</p>
+    body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(1200px 600px at 10% -20%, rgba(124,140,251,0.18), transparent 60%),
+          radial-gradient(900px 500px at 110% 10%, rgba(45,212,191,0.16), transparent 60%),
+          linear-gradient(180deg, #0a0f1e 0%, #0f172a 100%);
+        letter-spacing: 0.2px;
+    }
+
+    /* Top nav */
+    .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        backdrop-filter: blur(10px);
+        background: rgba(10,16,30,0.6);
+        border-bottom: 1px solid var(--border);
+    }
+    .topbar-inner {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 14px 20px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+    .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+    }
+    .logo {
+        width: 34px; height: 34px;
+        background: radial-gradient(circle at 30% 30%, var(--primary), var(--primary-2));
+        border-radius: 10px;
+        box-shadow: 0 6px 20px rgba(124,140,251,0.35);
+    }
+    .brand small {
+        color: var(--muted);
+        font-weight: 500;
+    }
+    .top-actions {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    /* Container */
+    .container {
+        max-width: 1200px;
+        margin: 22px auto 80px;
+        padding: 0 20px;
+    }
+
+    /* Panels */
+    .panel {
+        background: linear-gradient(180deg, var(--panel), var(--surface));
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: var(--card-shadow);
+        overflow: clip;
+    }
+    .panel + .panel { margin-top: 22px; }
+
+    .panel-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 18px 20px;
+        border-bottom: 1px solid var(--border);
+        background:
+          radial-gradient(600px 80px at 20% -60%, rgba(124,140,251,0.12), transparent 60%),
+          radial-gradient(600px 80px at 90% -70%, rgba(45,212,191,0.08), transparent 60%);
+    }
+    .icon {
+        font-size: 24px;
+        line-height: 1;
+    }
+    .panel-title {
+        font-size: 18px;
+        font-weight: 700;
+    }
+    .panel-subtitle {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 13px;
+    }
+    .panel-body { padding: 18px 20px; }
+
+    /* Inputs */
+    label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-weight: 600;
+        font-size: 12px;
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+    }
+    input, textarea, select {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: #0e1527;
+        color: var(--text);
+        font-size: 14px;
+        outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.25s ease;
+        box-shadow: var(--glow);
+    }
+    textarea { min-height: 100px; resize: vertical; }
+    input::placeholder, textarea::placeholder { color: #7d8ab0; }
+    input:focus, textarea:focus, select:focus {
+        border-color: rgba(124,140,251,0.55);
+        box-shadow: 0 0 0 6px rgba(124,140,251,0.08);
+    }
+
+    /* Layout helpers */
+    .grid {
+        display: grid;
+        gap: 14px;
+    }
+    .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    @media (max-width: 840px) {
+        .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    /* Buttons */
+    .btn {
+        padding: 11px 14px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        font-weight: 700;
+        font-size: 14px;
+        letter-spacing: 0.2px;
+        cursor: pointer;
+        color: var(--text);
+        transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
+        user-select: none;
+    }
+    .btn:active { transform: translateY(1px); }
+
+    .btn-primary {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
+        box-shadow: 0 10px 25px rgba(124,140,251,0.35);
+    }
+    .btn-primary:hover {
+        box-shadow: 0 16px 36px rgba(124,140,251,0.45);
+    }
+
+    .btn-secondary {
+        background: #111a31;
+        border-color: var(--border);
+    }
+    .btn-secondary:hover {
+        border-color: rgba(124,140,251,0.4);
+        background: #0f1830;
+    }
+
+    .btn-outline {
+        background: transparent;
+        border-color: rgba(124,140,251,0.35);
+        color: var(--primary);
+    }
+    .btn-outline:hover {
+        background: rgba(124,140,251,0.1);
+        border-color: rgba(124,140,251,0.55);
+    }
+
+    .quick-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 10px;
+    }
+
+    /* Example links */
+    .example-links {
+        background: #0e162a;
+        border: 1px dashed var(--border);
+        border-radius: 12px;
+        padding: 14px;
+    }
+    .example-links h3 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        color: var(--muted);
+        letter-spacing: 0.3px;
+    }
+    .example-links ul { list-style: none; padding: 0; margin: 0; }
+    .example-links li { margin: 6px 0; }
+    .example-links a {
+        display: inline-block;
+        color: var(--primary);
+        text-decoration: none;
+        padding: 8px 10px;
+        border-radius: 10px;
+        transition: background .2s ease;
+    }
+    .example-links a:hover { background: rgba(124,140,251,0.1); }
+
+    /* Results container */
+    .results-container {
+        background: #0e1527;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 14px;
+        margin-top: 12px;
+    }
+    .results-header {
+        font-size: 14px;
+        font-weight: 800;
+        margin: 0 0 10px;
+        color: var(--muted);
+        letter-spacing: 0.4px;
+        text-transform: uppercase;
+    }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; border-radius: 10px; }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #0f1730;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    th, td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        font-size: 14px;
+    }
+    thead th {
+        background:
+          linear-gradient(180deg, rgba(124,140,251,0.18), rgba(124,140,251,0.08));
+        color: var(--text);
+        text-align: left;
+        font-weight: 800;
+        letter-spacing: 0.3px;
+    }
+    tbody tr:hover {
+        background: rgba(124,140,251,0.08);
+    }
+
+    /* Status indicators */
+    .status-indicator {
+        display: inline-block;
+        width: 10px; height: 10px;
+        border-radius: 999px;
+        margin-right: 6px;
+    }
+    .status-success { background-color: var(--success); }
+    .status-warning { background-color: var(--warn); }
+    .status-error { background-color: var(--danger); }
+
+    /* Footer */
+    .footer {
+        border-top: 1px solid var(--border);
+        background: rgba(10,16,30,0.6);
+        text-align: center;
+        padding: 24px 20px 50px;
+        color: var(--muted);
+    }
+    .footer strong { color: var(--text); }
+
+    /* Loading */
+    #loading {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(8,12,24,0.45);
+        backdrop-filter: blur(2px);
+        z-index: 1000;
+    }
+    .loading-card {
+        position: absolute;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%);
+        background: linear-gradient(180deg, var(--panel), var(--surface));
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px 26px;
+        box-shadow: var(--card-shadow);
+        text-align: center;
+    }
+    .spinner {
+        width: 44px; height: 44px;
+        border: 4px solid rgba(255,255,255,0.09);
+        border-top: 4px solid var(--primary);
+        border-radius: 50%;
+        animation: spin 0.9s linear infinite;
+        margin: 0 auto 10px;
+    }
+    .loading-card h3 {
+        margin: 0;
+        font-size: 14px;
+        color: var(--muted);
+        letter-spacing: 0.3px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Header hero */
+    .hero {
+        padding: 30px 20px 20px;
+        background:
+          radial-gradient(900px 120px at 10% -30%, rgba(124,140,251,0.2), transparent 60%),
+          radial-gradient(900px 120px at 100% -40%, rgba(45,212,191,0.15), transparent 60%);
+        border-bottom: 1px solid var(--border);
+    }
+    .hero h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        letter-spacing: 0.4px;
+    }
+    .hero p {
+        margin: 0;
+        color: var(--muted);
+    }
+
+    /* Section spacing inside panels */
+    .section-block + .section-block { margin-top: 16px; }
+
+    /* Raw data */
+    pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        color: #b8c7ff;
+    }
+</style>
+
+</head> <body> <!-- Top bar --> <div class="topbar"> <div class="topbar-inner"> <div class="brand"> <div class="logo" aria-hidden="true"></div> <div> Healthcare Cost Navigator<br> <small>AI-Powered Search & Cost Analysis</small> </div> </div> <div class="top-actions"> <button class="btn btn-outline" onclick="checkHealth()"> <span class="status-indicator status-success"></span>Check API </button> <button class="btn btn-outline" onclick="getTemplateStats()">Templates</button> <button class="btn btn-primary" onclick="document.getElementById('aiQuestion').focus()">Ask AI</button> </div> </div> </div>
+
+    <div class="container">
+
+        <!-- Hero Panel -->
+        <div class="panel">
+            <div class="hero">
+                <h1>Healthcare Cost Navigator</h1>
+                <p>Discover providers, analyze costs, and ask questions in natural language.</p>
+            </div>
+            <div class="panel-body">
+                <!-- AI Assistant -->
+                <div class="section-block">
+                    <div class="panel-header" style="border:0; padding:0 0 14px;">
+                        <div class="icon">🤖</div>
+                        <div>
+                            <div class="panel-title">AI Assistant - Natural Language Queries</div>
+                            <div class="panel-subtitle">Ask about hospital costs, quality ratings, DRGs, and more.</div>
+                        </div>
+                    </div>
+    
+                    <div class="grid">
+                        <div>
+                            <label for="aiQuestion">Your Question</label>
+                            <textarea id="aiQuestion" rows="3" placeholder="e.g., Who has the cheapest hip replacement in NY?"></textarea>
+                        </div>
+                        <div class="quick-actions">
+                            <button class="btn btn-primary" onclick="askAI()">Ask AI Assistant</button>
+                            <button class="btn btn-secondary" onclick="clearAIResults()">Clear Results</button>
+                        </div>
+                        <div class="example-links">
+                            <h3>Example questions</h3>
+                            <ul>
+                                <li><a href="#" onclick="setQuestion('Who has the cheapest hip replacement in NY?')">Who has the cheapest hip replacement in NY?</a></li>
+                                <li><a href="#" onclick="setQuestion('Find highest rated hospitals for heart surgery')">Find highest rated hospitals for heart surgery</a></li>
+                                <li><a href="#" onclick="setQuestion('What are the most expensive procedures in California?')">What are the most expensive procedures in California?</a></li>
+                                <li><a href="#" onclick="setQuestion('Show me volume leaders for DRG 470')">Show me volume leaders for DRG 470</a></li>
+                                <li><a href="#" onclick="setQuestion('Which hospitals have ratings above 8 in Florida?')">Which hospitals have ratings above 8 in Florida?</a></li>
+                            </ul>
+                        </div>
+    
+                        <div class="results-container" id="aiResults">
+                            <h3 class="results-header">AI Response</h3>
+                            <div id="aiAnswer"></div>
+                            <div id="aiDetails" style="margin-top: 8px;"></div>
+                        </div>
                     </div>
                 </div>
-                
-                <div class="form-group">
-                    <label for="aiQuestion">Your Question:</label>
-                    <textarea id="aiQuestion" rows="3" placeholder="Ask me anything about healthcare costs... (e.g., 'Who has the cheapest hip replacement in NY?')"></textarea>
+            </div>
+        </div>
+    
+        <!-- Provider Search -->
+        <section class="panel">
+            <div class="panel-header">
+                <div class="icon">🏥</div>
+                <div>
+                    <div class="panel-title">Provider Search</div>
+                    <div class="panel-subtitle">Filter by location, DRG, rating, and cost.</div>
                 </div>
-                
-                <div class="quick-actions">
-                    <button class="btn btn-primary" onclick="askAI()">Ask AI Assistant</button>
-                    <button class="btn btn-secondary" onclick="clearAIResults()">Clear Results</button>
-                </div>
-                
-                <div class="example-links">
-                    <h3>📋 Example Questions (Click to try):</h3>
-                    <ul>
-                        <li><a href="#" onclick="setQuestion('Who has the cheapest hip replacement in NY?')">Who has the cheapest hip replacement in NY?</a></li>
-                        <li><a href="#" onclick="setQuestion('Find highest rated hospitals for heart surgery')">Find highest rated hospitals for heart surgery</a></li>
-                        <li><a href="#" onclick="setQuestion('What are the most expensive procedures in California?')">What are the most expensive procedures in California?</a></li>
-                        <li><a href="#" onclick="setQuestion('Show me volume leaders for DRG 470')">Show me volume leaders for DRG 470</a></li>
-                        <li><a href="#" onclick="setQuestion('Which hospitals have ratings above 8 in Florida?')">Which hospitals have ratings above 8 in Florida?</a></li>
-                    </ul>
-                </div>
-                
-                <div class="results-container" id="aiResults">
-                    <h3 class="results-header">AI Response:</h3>
-                    <div id="aiAnswer"></div>
-                    <div id="aiDetails"></div>
-                </div>
-            </section>
-
-            <!-- Provider Search Section -->
-            <section class="section">
-                <div class="section-header">
-                    <span class="section-icon">🏥</span>
-                    <h2 class="section-title">Provider Search</h2>
-                </div>
-                
-                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 20px; color: #2c3e50;">Search by Criteria</h3>
+            </div>
+            <div class="panel-body">
+                <div class="section-block">
+                    <h3 style="margin: 0 0 10px;">Search by Criteria</h3>
                     <form onsubmit="searchProviders(event)">
-                        <div class="form-row">
-                            <div class="form-col">
-                                <label for="searchState">State:</label>
+                        <div class="grid grid-2">
+                            <div>
+                                <label for="searchState">State</label>
                                 <input type="text" id="searchState" placeholder="NY" maxlength="2">
                             </div>
-                            <div class="form-col">
-                                <label for="searchCity">City:</label>
+                            <div>
+                                <label for="searchCity">City</label>
                                 <input type="text" id="searchCity" placeholder="New York">
                             </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-col">
-                                <label for="searchDrg">DRG Code:</label>
+                            <div>
+                                <label for="searchDrg">DRG Code</label>
                                 <input type="text" id="searchDrg" placeholder="470">
                             </div>
-                            <div class="form-col">
-                                <label for="searchRating">Minimum Rating:</label>
+                            <div>
+                                <label for="searchRating">Minimum Rating</label>
                                 <input type="number" id="searchRating" min="1" max="10" step="0.1" placeholder="8.0">
                             </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-col">
-                                <label for="searchCost">Maximum Cost:</label>
+                            <div>
+                                <label for="searchCost">Maximum Cost</label>
                                 <input type="number" id="searchCost" placeholder="100000">
                             </div>
-                            <div class="form-col">
-                                <label for="searchLimit">Results Limit:</label>
+                            <div>
+                                <label for="searchLimit">Results Limit</label>
                                 <input type="number" id="searchLimit" value="10" min="1" max="50">
                             </div>
                         </div>
-                        <div class="quick-actions">
+                        <div class="quick-actions" style="margin-top: 10px;">
                             <button type="submit" class="btn btn-primary">Search Providers</button>
                             <button type="button" class="btn btn-secondary" onclick="clearProviderSearch()">Clear Search</button>
                         </div>
                     </form>
                 </div>
-                
-                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 20px; color: #2c3e50;">Quick Searches</h3>
+    
+                <div class="section-block">
+                    <h3 style="margin: 0 0 10px;">Quick Searches</h3>
                     <div class="quick-actions">
                         <button class="btn btn-outline" onclick="getCheapestProviders('470')">Cheapest DRG 470 (Hip Replacement)</button>
                         <button class="btn btn-outline" onclick="getCheapestProviders('191')">Cheapest DRG 191 (Heart Surgery)</button>
@@ -343,105 +450,111 @@
                         <button class="btn btn-outline" onclick="getVolumeLeaders('470')">Volume Leaders DRG 470</button>
                     </div>
                 </div>
-                
-                <div class="results-container" id="providerResults">
-                    <h3 class="results-header">Provider Results:</h3>
-                    <div id="providerList"></div>
-                </div>
-            </section>
-
-            <!-- Cost Analysis Section -->
-            <section class="section">
-                <div class="section-header">
-                    <span class="section-icon">💰</span>
-                    <h2 class="section-title">Cost Analysis</h2>
-                </div>
-                
-                <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <div class="form-row">
-                        <div class="form-col">
-                            <label for="analysisCode">DRG Code:</label>
-                            <input type="text" id="analysisCode" placeholder="470" maxlength="10">
-                        </div>
-                        <div class="form-col">
-                            <label for="analysisState">State (optional):</label>
-                            <input type="text" id="analysisState" placeholder="NY" maxlength="2">
-                        </div>
-                    </div>
-                    <div class="quick-actions">
-                        <button class="btn btn-primary" onclick="analyzeCosts()">Analyze Costs</button>
+    
+                <div class="section-block">
+                    <div class="results-container" id="providerResults">
+                        <h3 class="results-header">Provider Results</h3>
+                        <div id="providerList"></div>
                     </div>
                 </div>
-                
-                <div class="results-container" id="costAnalysis">
-                    <h3 class="results-header">Cost Analysis Results:</h3>
+            </div>
+        </section>
+    
+        <!-- Cost Analysis -->
+        <section class="panel">
+            <div class="panel-header">
+                <div class="icon">💰</div>
+                <div>
+                    <div class="panel-title">Cost Analysis</div>
+                    <div class="panel-subtitle">Analyze distribution and extremes for a DRG.</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <div class="grid grid-2">
+                    <div>
+                        <label for="analysisCode">DRG Code</label>
+                        <input type="text" id="analysisCode" placeholder="470" maxlength="10">
+                    </div>
+                    <div>
+                        <label for="analysisState">State (optional)</label>
+                        <input type="text" id="analysisState" placeholder="NY" maxlength="2">
+                    </div>
+                </div>
+                <div class="quick-actions" style="margin-top: 12px;">
+                    <button class="btn btn-primary" onclick="analyzeCosts()">Analyze Costs</button>
+                </div>
+    
+                <div class="results-container" id="costAnalysis" style="margin-top: 12px;">
+                    <h3 class="results-header">Cost Analysis Results</h3>
                     <div id="costDetails"></div>
                 </div>
-            </section>
-
-            <!-- System Status -->
-            <section class="section">
-                <div class="section-header">
-                    <span class="section-icon">📊</span>
-                    <h2 class="section-title">System Status</h2>
+            </div>
+        </section>
+    
+        <!-- System Status -->
+        <section class="panel">
+            <div class="panel-header">
+                <div class="icon">📊</div>
+                <div>
+                    <div class="panel-title">System Status</div>
+                    <div class="panel-subtitle">API health and template usage.</div>
                 </div>
-                
+            </div>
+            <div class="panel-body">
                 <div class="quick-actions">
                     <button class="btn btn-outline" onclick="checkHealth()">
                         <span class="status-indicator status-success"></span>Check API Health
                     </button>
                     <button class="btn btn-outline" onclick="getTemplateStats()">Template Statistics</button>
                 </div>
-                
-                <div class="results-container" id="systemStatus">
-                    <div id="healthStatus"></div>
-                    <div id="templateStats"></div>
-                </div>
-            </section>
-
-            <!-- Raw Data Viewer -->
-            <section class="section">
-                <div class="section-header">
-                    <span class="section-icon">🔍</span>
-                    <h2 class="section-title">Raw Data Viewer</h2>
-                </div>
-                
-                <p style="margin-bottom: 20px; color: #6c757d;">View raw JSON responses for debugging and analysis</p>
-                <button class="btn btn-secondary" onclick="toggleRawData()">Toggle Raw Data Display</button>
-                
-                <div id="rawDataContainer" style="display: none; margin-top: 20px;">
-                    <div class="results-container">
-                        <h3 class="results-header">Last API Response:</h3>
-                        <pre id="rawData" style="background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px;"></pre>
+    
+                <div class="grid" style="margin-top: 12px;">
+                    <div class="results-container" id="systemStatus">
+                        <div id="healthStatus"></div>
+                        <div id="templateStats" style="margin-top: 10px;"></div>
                     </div>
                 </div>
-            </section>
-        </div>
-
+            </div>
+        </section>
+    
+        <!-- Raw Data Viewer -->
+        <section class="panel">
+            <div class="panel-header">
+                <div class="icon">🔍</div>
+                <div>
+                    <div class="panel-title">Raw Data Viewer</div>
+                    <div class="panel-subtitle">Inspect the latest API response payload.</div>
+                </div>
+            </div>
+            <div class="panel-body">
+                <p style="margin: 0 0 10px; color: var(--muted);">View raw JSON responses for debugging and analysis.</p>
+                <button class="btn btn-secondary" onclick="toggleRawData()">Toggle Raw Data Display</button>
+                <div id="rawDataContainer" style="display: none; margin-top: 12px;">
+                    <div class="results-container">
+                        <h3 class="results-header">Last API Response</h3>
+                        <pre id="rawData"></pre>
+                    </div>
+                </div>
+            </div>
+        </section>
+    
         <!-- Footer -->
         <div class="footer">
-            <p><strong>Healthcare Cost Navigator v2.0</strong> - AI-Powered Hospital Search Platform</p>
+            <p><strong>Healthcare Cost Navigator v2.0</strong> — AI-Powered Hospital Search Platform</p>
             <p>Built with FastAPI, PostgreSQL, OpenAI GPT-4, and pgvector</p>
             <p>Features: Natural Language Processing, Template Matching, Vector Search, DRG Lookup</p>
         </div>
     </div>
-
+    
     <!-- Loading indicator -->
-    <div id="loading" class="loading" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); z-index: 1000;">
-        <div style="text-align: center;">
-            <div style="display: inline-block; width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #667eea; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <h3 style="margin-top: 15px; color: #667eea;">Loading...</h3>
+    <div id="loading">
+        <div class="loading-card">
+            <div class="spinner"></div>
+            <h3>Loading...</h3>
         </div>
     </div>
-
-    <style>
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
-
+    
     <script src="app.js"></script>
     <script src="ws.js"></script>
-</body>
-</html>
+
+</body> </html>
