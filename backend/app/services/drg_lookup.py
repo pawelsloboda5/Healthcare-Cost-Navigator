@@ -37,7 +37,7 @@ class DRGLookupService:
         self, 
         session: AsyncSession, 
         phrase: str, 
-        similarity_threshold: float = 0.5  # Lowered from 0.7 to 0.5 for better medical term matching
+        similarity_threshold: float = 0.3  # Lowered from 0.7 to 0.5 for better medical term matching
     ) -> Optional[str]:
         """
         Find DRG code using vector-based semantic search
@@ -128,7 +128,7 @@ class DRGLookupService:
         session: AsyncSession,
         phrase: str,
         limit: int = 20,  # Increased from 5 to 10 for more options
-        similarity_threshold: float = 0.4  # Lowered from 0.6 to 0.4 for broader medical term matching
+        similarity_threshold: float = 0.3  # Lowered from 0.6 to 0.4 for broader medical term matching
     ) -> List[Tuple[str, str, float]]:
         """
         Find multiple similar procedures for suggestion/debugging
