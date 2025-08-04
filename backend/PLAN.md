@@ -228,4 +228,89 @@ LIMIT $2;
 2. **Add missing dependencies** to requirements.txt
 3. **Implement TemplateService** with basic normalization
 4. **Test with simple NL queries** on existing data
-5. **Iterate and expand** template catalog based on usage patterns 
+5. **Iterate and expand** template catalog based on usage patterns
+
+---
+
+## Feature: Multi-State Cost Comparison Queries ("Cheapest procedure in NY vs CA")
+
+### Objective
+Enable users to compare procedure costs across multiple states in a single natural-language question.
+
+### Deliverables
+1. **StructuredQueryParser**
+   • Add optional `states: List[str]` field (plural) and new `query_type` value `STATE_COMPARISON`.
+   • Extend function-calling schema and normalisation logic to extract multiple states from queries like "NY or CA" / "New York vs California".
+
+2. **Templates & Catalog**
+   • Create template:  
+```sql
+SELECT pp.provider_state,
+       MIN(pp.average_covered_charges)  AS cheapest_cost,
+       FIRST_VALUE(p.provider_name) OVER w AS cheapest_provider,
+       FIRST_VALUE(d.drg_description) OVER w AS procedure
+FROM   provider_procedures pp
+JOIN   providers p ON p.provider_id = pp.provider_id
+JOIN   drg_procedures d ON d.drg_code = pp.drg_code
+WHERE  d.drg_description ILIKE $1            -- procedure keyword
+  AND  pp.provider_state IN ($2,$3)          -- dynamic state list (2+)
+WINDOW w AS (PARTITION BY pp.provider_state ORDER BY pp.average_covered_charges)
+GROUP  BY pp.provider_state
+ORDER  BY cheapest_cost
+LIMIT  $4;
+```
+   • Comment: "Cheapest provider for procedure across multiple states".
+   • Embed + add to `template_catalog` via migration/seed.
+
+3. **EnhancedAIService**
+   • Map `STATE_COMPARISON` to new `_generate_structured_sql()` branch.
+   • When multiple states provided, request template matching with user_intent containing `state_comparison`.
+   • Fallback RAG prompt must include example comparing two states.
+
+4. **ProviderService** *(optional path)*
+   • Add helper `get_cheapest_by_state(procedure_drg, states, limit)` returning list of dicts.
+   • Used by templates as execution fallback.
+
+5. **Explanation Layer**
+   • `explain_query_results()` to spot state aggregates and craft comparative language ("In NY the cheapest is …, whereas in CA …").
+
+6. **Testing**
+   • Unit tests for parser extracting `['NY','CA']` from sample question.
+   • Integration test hitting `/ask` with the user question; assert both states present in answer.
+
+7. **Documentation**
+   • Update `docs/AI_SQL_Generation.md` with new query type examples.
+   • Add entry to API README showcasing the feature.
+
+### Affected Files
+| File | Change |
+| --- | --- |
+| `backend/app/services/structured_query_parser.py` | Add `states: List[str]`, new `QueryType.STATE_COMPARISON`, parsing logic |
+| `backend/app/services/ai_service.py` | Handle `STATE_COMPARISON` in `_generate_structured_sql`, intent extraction, RAG prompt |
+| `backend/app/services/provider_service.py` | (Optional) new helper `get_cheapest_by_state` |
+| `backend/app/models/models.py` | No schema changes, but migration seed touches `template_catalog` |
+| `alembic/versions/*_add_state_comparison_template.py` | Migration script to insert new template & embedding |
+| `backend/app/utils/template_loader.py` | Ensure parameter mapping supports dynamic IN-clause counts |
+| `*tests/test_state_comparison.py` | New unit & integration tests |
+| `docs/AI_SQL_Generation.md` | Add examples & explanation |
+| `README.md` | Update API examples section |
+
+> NOTE: file names prefixed with `*` will be created new during implementation.
+
+### Timeline & Ownership
+| Task | Owner | Est. Effort |
+| --- | --- | --- |
+| Parser update & tests | AI team | 4h |
+| Template creation & migration | DB team | 2h |
+| AI service logic | AI team | 3h |
+| ProviderService helper | Data team | 2h |
+| Docs & examples | DevRel | 1h |
+
+### Risks & Mitigations
+• Mis-parsing "or"/"vs" syntax → Extensive prompt examples and unit tests.  
+• Dynamic IN-clause length → Build param list programmatically; cap at 5 states for safety.  
+• Template match confidence drop → Use intent filter `state_comparison` to avoid single-state templates.
+
+### Success Criteria
+✓ `/ask` query "Who has the cheapest heart surgeries NY or CA?" returns two rows (NY, CA) with provider names & costs **under 2s** execution time and passes safety validator.
+ 

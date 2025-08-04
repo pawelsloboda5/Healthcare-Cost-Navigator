@@ -4,6 +4,7 @@
 Services encapsulate **business logic** and orchestrate utilities/data-access.
 
 ### EnhancedAIService (`ai_service.py`)
+* NEW: Supports `STATE_COMPARISON` queries (multi-state cost comparison). Parser returns `states: List[str]`; AI service builds an `IN (...)` SQL leveraging partition window to find cheapest provider per state.
 * Pipeline: Natural-language → `StructuredQueryParser` → (Template match | RAG) → SQL.
 * Enforces safety via `SQLNormalizer.validate_sql_safety`.
 * Learns successful queries → stores in `template_catalog` for future matches.
