@@ -54,7 +54,8 @@ async function askAI() {
 
     showLoading();
     try {
-        const response = await fetch(`${API_BASE}/ask`, {
+        // First request: get results without explanation for quick render
+        const response = await fetch(`${API_BASE}/ask?explain=false`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -69,17 +70,48 @@ async function askAI() {
         updateRawData(data);
 
         if (data.success) {
+            // Hide loading immediately - show table first
+            hideLoading();
             displayAIResponse(data);
+            if (data.explanation_pending) {
+                // show placeholder spinner text
+                document.getElementById('aiAnswer').innerHTML = '<em>Generating explanation...</em>';
+                fetchExplanation(question, data.sql_query, data.results);
+            }
         } else {
+            hideLoading();
             document.getElementById('aiAnswer').innerHTML = `<strong>Error:</strong> ${data.answer}`;
             document.getElementById('aiDetails').innerHTML = '';
         }
     } catch (error) {
+        hideLoading();
         document.getElementById('aiAnswer').innerHTML = handleApiError(error, 'AI Assistant');
         document.getElementById('aiDetails').innerHTML = '';
-    } finally {
-        hideLoading();
     }
+}
+
+function fetchExplanation(question, sqlQuery, results) {
+    fetch(`${API_BASE}/explain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            question: question,
+            sql_query: sqlQuery,
+            results: results
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data && data.answer) {
+            document.getElementById('aiAnswer').innerHTML = `<strong>Answer:</strong> ${data.answer}`;
+        } else {
+            document.getElementById('aiAnswer').innerHTML = '<em>Failed to generate explanation.</em>';
+        }
+    })
+    .catch(err => {
+        console.error('Explain error', err);
+        document.getElementById('aiAnswer').innerHTML = handleApiError(err, 'Explanation');
+    });
 }
 
 function displayAIResponse(data) {

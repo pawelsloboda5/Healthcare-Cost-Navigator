@@ -61,12 +61,21 @@ class AskRequest(BaseModel):
 
 class AskResponse(BaseModel):
     success: bool
-    answer: str
+    answer: str = ""
     sql_query: Optional[str] = None
     results: Optional[List[dict]] = None
     template_used: Optional[int] = None
     confidence_score: Optional[float] = None
     execution_time_ms: Optional[int] = None
+    explanation_pending: bool = False
+
+class ExplainRequest(BaseModel):
+    question: str
+    sql_query: str
+    results: List[dict]
+
+class ExplainResponse(BaseModel):
+    answer: str
 
 class CostAnalysisResponse(BaseModel):
     drg_code: str
@@ -105,7 +114,8 @@ async def get_template_statistics(db: AsyncSession = Depends(get_db)):
 @router.post("/ask", response_model=AskResponse)
 async def ask_ai_assistant(
     request: AskRequest,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    explain: bool = Query(True, description="Include natural language explanation")
 ):
     """
     Enhanced natural language interface for healthcare cost and quality queries
@@ -122,9 +132,9 @@ async def ask_ai_assistant(
             use_template_matching=request.use_template_matching
         )
         
-        # Generate natural language explanation if successful
+        # Generate natural language explanation (optional)
         explanation = ""
-        if result.success and result.results:
+        if explain and result.success and result.results:
             explanation = await ai_service.explain_query_results(
                 user_query=request.question,
                 sql_query=result.sql_query or "",
@@ -135,12 +145,13 @@ async def ask_ai_assistant(
         
         return AskResponse(
             success=result.success,
-            answer=explanation if explanation else result.message,
+            answer=explanation if explanation else "",
             sql_query=result.sql_query,
             results=result.results,
             template_used=result.template_used,
             confidence_score=result.confidence_score,
-            execution_time_ms=execution_time
+            execution_time_ms=execution_time,
+            explanation_pending= (not explain and result.success and bool(result.results))
         )
         
     except Exception as e:
@@ -152,6 +163,24 @@ async def ask_ai_assistant(
             answer="I'm sorry, I encountered an error while processing your question. Please try rephrasing your question.",
             execution_time_ms=execution_time
         )
+
+# Explanation endpoint – generate natural language summary separately
+@router.post("/explain", response_model=ExplainResponse)
+async def explain_query(
+    request: ExplainRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Generate natural-language explanation for already executed SQL results"""
+    try:
+        answer = await ai_service.explain_query_results(
+            user_query=request.question,
+            sql_query=request.sql_query,
+            results=request.results
+        )
+        return ExplainResponse(answer=answer)
+    except Exception as e:
+        logger.error(f"Explain endpoint failed: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate explanation")
 
 # Provider search endpoints
 @router.post("/providers/search", response_model=List[ProviderResponse])

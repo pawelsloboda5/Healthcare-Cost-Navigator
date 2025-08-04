@@ -370,13 +370,43 @@
         border: 1px solid var(--border);
     }
 
-    /* Charts */
-.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media (max-width:900px){.chart-grid{grid-template-columns:1fr}}
-.chart-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;height:200px}
-.chart-card h4{margin:0 0 10px;font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
-.chart-canvas{height:160px;position:relative}
-.chart-canvas canvas{width:100%!important;height:100%!important}
+    /* Chart containers with fixed heights */
+    .chart-container {
+        height: 120px;
+        max-height: 120px;
+        overflow: hidden;
+        position: relative;
+        padding: 8px;
+    }
+    
+    .chart-container-wide {
+        height: 100px;
+        max-height: 100px;
+        overflow: hidden;
+        position: relative;
+        padding: 8px;
+    }
+    
+    .chart-container canvas,
+    .chart-container-wide canvas {
+        width: 100% !important;
+        height: 100% !important;
+        max-height: inherit;
+    }
+
+    /* Compact results headers for charts */
+    .chart-container .results-header,
+    .chart-container-wide .results-header {
+        margin: 0 0 8px 0;
+        font-size: 11px;
+    }
+
+    /* Responsive chart grid */
+    @media (max-width: 768px) {
+        .chart-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
 </style>
 </head> <body> <div class="shell"> <!-- Sidebar --> <aside class="sidebar"> <div class="sb-header"> <div class="logo-wrap" aria-label="HCN Logo"> <!-- Custom SVG Logo --> <svg class="icon-20" viewBox="0 0 24 24" fill="none"> <path d="M7 7l5-3 5 3v6l-5 3-5-3V7z" stroke="url(#g1)" stroke-width="1.5"/> <path d="M12 4v12" stroke="url(#g2)" stroke-width="1.2" opacity="0.7"/> <defs> <linearGradient id="g1" x1="0" y1="0" x2="24" y2="24"> <stop offset="0%" stop-color="#4f46e5"/> <stop offset="100%" stop-color="#10b981"/> </linearGradient> <linearGradient id="g2" x1="12" y1="4" x2="12" y2="16"> <stop offset="0%" stop-color="#4f46e5"/> <stop offset="100%" stop-color="#7c8cfb"/> </linearGradient> </defs> </svg> </div> <div> <div class="brand-title">HCN Dashboard</div> <div class="brand-sub">Healthcare Cost Navigator</div> </div> </div>
     <nav class="nav">
@@ -747,24 +777,24 @@
             </div>
         </div>
         
-        <div class="chart-grid" style="margin-top:12px;">
-            <div class="chart-card">
-                <h4>Distribution</h4>
-                <div class="chart-canvas">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px;" class="chart-grid">
+            <div class="results-container">
+                <div class="chart-container">
+                    <h3 class="results-header">Distribution</h3>
                     <canvas id="chartDistribution"></canvas>
                 </div>
             </div>
-            <div class="chart-card">
-                <h4>Rating vs Cost</h4>
-                <div class="chart-canvas">
+            <div class="results-container">
+                <div class="chart-container">
+                    <h3 class="results-header">Rating vs Cost</h3>
                     <canvas id="chartScatter"></canvas>
                 </div>
             </div>
         </div>
         
-        <div class="chart-card" style="margin-top:12px;">
-            <h4>Provider Cost Comparison</h4>
-            <div class="chart-canvas">
+        <div class="results-container" style="margin-top:12px;">
+            <div class="chart-container-wide">
+                <h3 class="results-header">Provider Cost Comparison</h3>
                 <canvas id="chartProviders"></canvas>
             </div>
         </div>
