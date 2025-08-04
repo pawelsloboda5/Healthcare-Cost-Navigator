@@ -1,109 +1,174 @@
-<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Healthcare Cost Navigator - AI Assistant</title> <meta name="color-scheme" content="light dark"> <style> :root { --bg: #0f172a; /* slate-900 */ --panel: #0b1220; /* deep panel */ --surface: #121a2b; /* subtle surface */ --muted: #93a4c4; /* desaturated text */ --text: #e6ecff; /* bright text */ --primary: #7c8cfb; /* periwinkle */ --primary-2: #a772ff; /* accent blend */ --accent: #2dd4bf; /* teal accent */ --border: #1f2a44; /* border color */ --success: #22c55e; --warn: #fbbf24; --danger: #ef4444; --card-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.03); --glow: 0 0 0 rgba(124,140,251,0); /* animated on focus */ }
+<!DOCTYPE html> <html lang="en"> <head> <meta charset="UTF-8"> <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Healthcare Cost Navigator - AI Assistant</title> <meta name="color-scheme" content="light"> <style> :root { --bg: #f6f8fb; --content: #ffffff; --panel: #ffffff; --panel-2: #f9fbff; --text: #0f172a; --muted: #526081; --muted-2: #6b7a99; --border: #e3e8f5; --primary: #4f46e5; /* Indigo */ --primary-2: #7c8cfb; /* Periwinkle */ --accent: #10b981; /* Emerald */ --success: #16a34a; --warn: #f59e0b; --danger: #ef4444; --shadow-1: 0 6px 16px rgba(16, 24, 40, 0.05); --shadow-2: 0 14px 36px rgba(16, 24, 40, 0.10); --table-head: linear-gradient(180deg, #f5f7ff, #eef2ff); --table-row-hover: #f8fafc; --input-bg: #ffffff; --chip-bg: #eef2ff; }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
-
     body {
         margin: 0;
-        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
         color: var(--text);
         background:
-          radial-gradient(1200px 600px at 10% -20%, rgba(124,140,251,0.18), transparent 60%),
-          radial-gradient(900px 500px at 110% 10%, rgba(45,212,191,0.16), transparent 60%),
-          linear-gradient(180deg, #0a0f1e 0%, #0f172a 100%);
-        letter-spacing: 0.2px;
+          radial-gradient(1200px 600px at 10% -20%, rgba(124,140,251,0.08), transparent 60%),
+          radial-gradient(1000px 600px at 110% -20%, rgba(16,185,129,0.08), transparent 60%),
+          linear-gradient(180deg, #f7f9fc 0%, #f6f8fb 100%);
     }
 
-    /* Top nav */
-    .topbar {
+    /* Layout: Sidebar + Main */
+    .shell {
+        display: grid;
+        grid-template-columns: 260px 1fr;
+        grid-template-rows: 64px 1fr;
+        grid-template-areas:
+            "sidebar topbar"
+            "sidebar main";
+        min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+        grid-area: sidebar;
+        background: linear-gradient(180deg, var(--panel-2), var(--panel));
+        border-right: 1px solid var(--border);
         position: sticky;
         top: 0;
-        z-index: 50;
-        backdrop-filter: blur(10px);
-        background: rgba(10,16,30,0.6);
-        border-bottom: 1px solid var(--border);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
     }
-    .topbar-inner {
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 14px 20px;
+    .sb-header {
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: 12px;
+        padding: 16px 16px 14px;
+        border-bottom: 1px solid var(--border);
     }
-    .brand {
+    .logo-wrap {
+        display: grid;
+        place-items: center;
+        width: 36px; height: 36px;
+        background: #f1f4ff;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow-1);
+    }
+    .brand-title {
+        font-weight: 800;
+        letter-spacing: 0.3px;
+        line-height: 1.1;
+    }
+    .brand-sub {
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.3px;
+    }
+    .nav {
+        padding: 16px 10px;
+        display: grid;
+        gap: 6px;
+    }
+    .nav a {
         display: flex;
         align-items: center;
         gap: 10px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-    .logo {
-        width: 34px; height: 34px;
-        background: radial-gradient(circle at 30% 30%, var(--primary), var(--primary-2));
+        padding: 10px 10px;
+        text-decoration: none;
+        color: var(--text);
         border-radius: 10px;
-        box-shadow: 0 6px 20px rgba(124,140,251,0.35);
+        border: 1px solid transparent;
+        font-weight: 600;
     }
-    .brand small {
+    .nav a:hover {
+        background: #f4f6ff;
+        border-color: #e6eaff;
+    }
+    .nav .active {
+        background: #eef2ff;
+        border-color: #e0e7ff;
+    }
+    .sb-footer {
+        margin-top: auto;
+        padding: 12px 14px 16px;
         color: var(--muted);
-        font-weight: 500;
+        font-size: 12px;
+        border-top: 1px solid var(--border);
+    }
+
+    /* Top bar */
+    .topbar {
+        grid-area: topbar;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--border);
+        background: rgba(255,255,255,0.8);
+        backdrop-filter: blur(6px);
     }
     .top-actions {
-        margin-left: auto;
         display: flex;
         gap: 8px;
         flex-wrap: wrap;
     }
 
-    /* Container */
-    .container {
-        max-width: 1200px;
-        margin: 22px auto 80px;
-        padding: 0 20px;
+    /* Main content */
+    .main {
+        grid-area: main;
+        padding: 18px;
+    }
+    .page-grid {
+        display: grid;
+        grid-template-columns: 1.35fr 1fr;
+        gap: 18px;
+    }
+    @media (max-width: 1100px) {
+        .shell { grid-template-columns: 220px 1fr; }
+        .page-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 840px) {
+        .shell {
+            grid-template-columns: 1fr;
+            grid-template-areas:
+                "topbar"
+                "main";
+        }
+        .sidebar { display: none; }
     }
 
-    /* Panels */
-    .panel {
-        background: linear-gradient(180deg, var(--panel), var(--surface));
+    /* Cards/Panels */
+    .card {
+        background: var(--panel);
         border: 1px solid var(--border);
-        border-radius: 16px;
-        box-shadow: var(--card-shadow);
-        overflow: clip;
+        border-radius: 14px;
+        box-shadow: var(--shadow-1);
     }
-    .panel + .panel { margin-top: 22px; }
-
-    .panel-header {
+    .card-header {
         display: flex;
         align-items: flex-start;
-        gap: 12px;
-        padding: 18px 20px;
+        gap: 10px;
+        padding: 14px 16px;
         border-bottom: 1px solid var(--border);
-        background:
-          radial-gradient(600px 80px at 20% -60%, rgba(124,140,251,0.12), transparent 60%),
-          radial-gradient(600px 80px at 90% -70%, rgba(45,212,191,0.08), transparent 60%);
     }
-    .icon {
-        font-size: 24px;
-        line-height: 1;
+    .card-title {
+        font-size: 15px;
+        font-weight: 800;
+        letter-spacing: 0.3px;
     }
-    .panel-title {
-        font-size: 18px;
-        font-weight: 700;
-    }
-    .panel-subtitle {
-        margin-top: 2px;
+    .card-sub {
         color: var(--muted);
-        font-size: 13px;
+        font-size: 12px;
+        margin-top: 2px;
     }
-    .panel-body { padding: 18px 20px; }
+    .card-body { padding: 16px; }
 
     /* Inputs */
     label {
         display: block;
         margin-bottom: 6px;
         color: var(--muted);
-        font-weight: 600;
-        font-size: 12px;
-        letter-spacing: 0.4px;
+        font-weight: 700;
+        font-size: 11px;
+        letter-spacing: 0.35px;
         text-transform: uppercase;
     }
     input, textarea, select {
@@ -111,129 +176,116 @@
         padding: 12px 14px;
         border-radius: 12px;
         border: 1px solid var(--border);
-        background: #0e1527;
+        background: var(--input-bg);
         color: var(--text);
         font-size: 14px;
         outline: none;
         transition: border-color 0.2s ease, box-shadow 0.25s ease;
-        box-shadow: var(--glow);
     }
-    textarea { min-height: 100px; resize: vertical; }
-    input::placeholder, textarea::placeholder { color: #7d8ab0; }
+    input::placeholder, textarea::placeholder { color: #98a2b3; }
     input:focus, textarea:focus, select:focus {
-        border-color: rgba(124,140,251,0.55);
-        box-shadow: 0 0 0 6px rgba(124,140,251,0.08);
+        border-color: #c7d2fe;
+        box-shadow: 0 0 0 6px #eef2ff;
     }
+    textarea { min-height: 96px; resize: vertical; }
 
-    /* Layout helpers */
-    .grid {
-        display: grid;
-        gap: 14px;
-    }
-    .grid-2 {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-    @media (max-width: 840px) {
-        .grid-2 { grid-template-columns: 1fr; }
+    /* Form layout */
+    .grid { display: grid; gap: 12px; }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (max-width: 900px) {
+        .grid-2, .grid-3 { grid-template-columns: 1fr; }
     }
 
     /* Buttons */
     .btn {
-        padding: 11px 14px;
+        padding: 10px 14px;
         border-radius: 12px;
         border: 1px solid transparent;
-        font-weight: 700;
-        font-size: 14px;
-        letter-spacing: 0.2px;
+        font-weight: 800;
+        font-size: 13px;
+        letter-spacing: 0.25px;
         cursor: pointer;
         color: var(--text);
-        transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
+        transition: transform .12s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
         user-select: none;
     }
     .btn:active { transform: translateY(1px); }
-
     .btn-primary {
+        color: #fff;
         background: linear-gradient(135deg, var(--primary) 0%, var(--primary-2) 100%);
-        box-shadow: 0 10px 25px rgba(124,140,251,0.35);
+        box-shadow: 0 10px 24px rgba(79,70,229,0.2);
+        border: 1px solid #c7d2fe;
     }
-    .btn-primary:hover {
-        box-shadow: 0 16px 36px rgba(124,140,251,0.45);
-    }
-
+    .btn-primary:hover { box-shadow: 0 16px 34px rgba(79,70,229,0.28); }
     .btn-secondary {
-        background: #111a31;
+        background: #f8fafc;
         border-color: var(--border);
     }
     .btn-secondary:hover {
-        border-color: rgba(124,140,251,0.4);
-        background: #0f1830;
+        border-color: #d0d7ee;
+        background: #f1f5f9;
     }
-
     .btn-outline {
         background: transparent;
-        border-color: rgba(124,140,251,0.35);
+        border-color: #c7d2fe;
         color: var(--primary);
     }
     .btn-outline:hover {
-        background: rgba(124,140,251,0.1);
-        border-color: rgba(124,140,251,0.55);
+        background: #eef2ff;
+        border-color: #a5b4fc;
     }
-
-    .quick-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        margin-top: 10px;
-    }
+    .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
     /* Example links */
     .example-links {
-        background: #0e162a;
+        background: #f9fbff;
         border: 1px dashed var(--border);
         border-radius: 12px;
-        padding: 14px;
+        padding: 12px;
     }
     .example-links h3 {
         margin: 0 0 8px;
-        font-size: 14px;
+        font-size: 12px;
         color: var(--muted);
-        letter-spacing: 0.3px;
+        text-transform: uppercase;
+        letter-spacing: 0.35px;
     }
     .example-links ul { list-style: none; padding: 0; margin: 0; }
     .example-links li { margin: 6px 0; }
     .example-links a {
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
         color: var(--primary);
         text-decoration: none;
-        padding: 8px 10px;
-        border-radius: 10px;
+        padding: 6px 8px;
+        border-radius: 8px;
         transition: background .2s ease;
     }
-    .example-links a:hover { background: rgba(124,140,251,0.1); }
+    .example-links a:hover { background: #eef2ff; }
 
-    /* Results container */
+    /* Results container and tables */
     .results-container {
-        background: #0e1527;
+        background: #ffffff;
         border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 14px;
-        margin-top: 12px;
+        padding: 12px;
+        margin-top: 10px;
     }
     .results-header {
-        font-size: 14px;
-        font-weight: 800;
-        margin: 0 0 10px;
+        font-size: 12px;
+        font-weight: 900;
+        margin: 0 0 6px;
         color: var(--muted);
-        letter-spacing: 0.4px;
+        letter-spacing: 0.35px;
         text-transform: uppercase;
     }
-
-    /* Tables */
     .table-wrap { overflow-x: auto; border-radius: 10px; }
     table {
         width: 100%;
         border-collapse: collapse;
-        background: #0f1730;
+        background: #ffffff;
         border: 1px solid var(--border);
         border-radius: 10px;
         overflow: hidden;
@@ -244,16 +296,13 @@
         font-size: 14px;
     }
     thead th {
-        background:
-          linear-gradient(180deg, rgba(124,140,251,0.18), rgba(124,140,251,0.08));
+        background: var(--table-head);
         color: var(--text);
         text-align: left;
         font-weight: 800;
         letter-spacing: 0.3px;
     }
-    tbody tr:hover {
-        background: rgba(124,140,251,0.08);
-    }
+    tbody tr:hover { background: var(--table-row-hover); }
 
     /* Status indicators */
     .status-indicator {
@@ -268,20 +317,21 @@
 
     /* Footer */
     .footer {
+        margin-top: 16px;
         border-top: 1px solid var(--border);
-        background: rgba(10,16,30,0.6);
+        background: rgba(255,255,255,0.8);
         text-align: center;
-        padding: 24px 20px 50px;
+        padding: 20px 18px 40px;
         color: var(--muted);
     }
     .footer strong { color: var(--text); }
 
-    /* Loading */
+    /* Loading overlay */
     #loading {
         display: none;
         position: fixed;
         inset: 0;
-        background: rgba(8,12,24,0.45);
+        background: rgba(15,23,42,0.08);
         backdrop-filter: blur(2px);
         z-index: 1000;
     }
@@ -289,16 +339,16 @@
         position: absolute;
         top: 50%; left: 50%;
         transform: translate(-50%, -50%);
-        background: linear-gradient(180deg, var(--panel), var(--surface));
+        background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 14px;
         padding: 22px 26px;
-        box-shadow: var(--card-shadow);
+        box-shadow: var(--shadow-2);
         text-align: center;
     }
     .spinner {
         width: 44px; height: 44px;
-        border: 4px solid rgba(255,255,255,0.09);
+        border: 4px solid rgba(15,23,42,0.08);
         border-top: 4px solid var(--primary);
         border-radius: 50%;
         animation: spin 0.9s linear infinite;
@@ -312,59 +362,124 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Header hero */
-    .hero {
-        padding: 30px 20px 20px;
-        background:
-          radial-gradient(900px 120px at 10% -30%, rgba(124,140,251,0.2), transparent 60%),
-          radial-gradient(900px 120px at 100% -40%, rgba(45,212,191,0.15), transparent 60%);
-        border-bottom: 1px solid var(--border);
-    }
-    .hero h1 {
-        margin: 0 0 6px;
-        font-size: 28px;
-        letter-spacing: 0.4px;
-    }
-    .hero p {
-        margin: 0;
-        color: var(--muted);
-    }
-
-    /* Section spacing inside panels */
-    .section-block + .section-block { margin-top: 16px; }
-
-    /* Raw data */
     pre {
         margin: 0;
         white-space: pre-wrap;
         word-wrap: break-word;
         font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         font-size: 12px;
-        color: #b8c7ff;
+        color: #0f172a;
     }
+
+    /* Utility: section spacing */
+    .section-block + .section-block { margin-top: 12px; }
+
+    /* SVG icon sizing */
+    .icon-16 { width: 16px; height: 16px; }
+    .icon-18 { width: 18px; height: 18px; }
+    .icon-20 { width: 20px; height: 20px; }
+    .icon-24 { width: 24px; height: 24px; }
+    .icon-muted path { stroke: var(--muted-2); }
+    .icon-primary path { stroke: var(--primary); }
+    .icon-solid path { fill: var(--primary); }
 </style>
 
-</head> <body> <!-- Top bar --> <div class="topbar"> <div class="topbar-inner"> <div class="brand"> <div class="logo" aria-hidden="true"></div> <div> Healthcare Cost Navigator<br> <small>AI-Powered Search & Cost Analysis</small> </div> </div> <div class="top-actions"> <button class="btn btn-outline" onclick="checkHealth()"> <span class="status-indicator status-success"></span>Check API </button> <button class="btn btn-outline" onclick="getTemplateStats()">Templates</button> <button class="btn btn-primary" onclick="document.getElementById('aiQuestion').focus()">Ask AI</button> </div> </div> </div>
+</head> <body> <div class="shell"> <!-- Sidebar --> <aside class="sidebar"> <div class="sb-header"> <div class="logo-wrap" aria-label="HCN Logo"> <!-- Custom SVG Logo (interlocked nodes) --> <svg class="icon-20" viewBox="0 0 24 24" fill="none"> <path d="M7 7l5-3 5 3v6l-5 3-5-3V7z" stroke="url(#g1)" stroke-width="1.5"/> <path d="M12 4v12" stroke="url(#g2)" stroke-width="1.2" opacity="0.7"/> <defs> <linearGradient id="g1" x1="0" y1="0" x2="24" y2="24"> <stop offset="0%" stop-color="#4f46e5"/> <stop offset="100%" stop-color="#10b981"/> </linearGradient> <linearGradient id="g2" x1="12" y1="4" x2="12" y2="16"> <stop offset="0%" stop-color="#4f46e5"/> <stop offset="100%" stop-color="#7c8cfb"/> </linearGradient> </defs> </svg> </div> <div> <div class="brand-title">HCN Dashboard</div> <div class="brand-sub">Healthcare Cost Navigator</div> </div> </div>
+    <nav class="nav">
+        <a href="#" class="active">
+            <!-- Home icon -->
+            <svg class="icon-18 icon-muted" viewBox="0 0 24 24" fill="none">
+                <path d="M3 11l9-7 9 7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M5 10v10h14V10" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Overview
+        </a>
+        <a href="#aiSection" onclick="document.getElementById('aiQuestion').focus()">
+            <!-- Spark icon -->
+            <svg class="icon-18 icon-muted" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3v6M12 15v6M21 12h-6M9 12H3M17 7l-4 4 4 4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            AI Assistant
+        </a>
+        <a href="#providerSection">
+            <!-- Building/hospital icon -->
+            <svg class="icon-18 icon-muted" viewBox="0 0 24 24" fill="none">
+                <path d="M4 20V7a2 2 0 012-2h12a2 2 0 012 2v13" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M9 20V9h6v11" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M3 20h18" stroke-width="1.6" stroke-linecap="round"/>
+            </svg>
+            Providers
+        </a>
+        <a href="#analysisSection">
+            <!-- Chart icon -->
+            <svg class="icon-18 icon-muted" viewBox="0 0 24 24" fill="none">
+                <path d="M4 19V5M4 19h16" stroke-width="1.6" stroke-linecap="round"/>
+                <path d="M8 15l3-3 3 2 4-6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Cost Analysis
+        </a>
+        <a href="#statusSection">
+            <!-- Activity/health icon -->
+            <svg class="icon-18 icon-muted" viewBox="0 0 24 24" fill="none">
+                <path d="M3 12h4l2-4 4 8 2-4h6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            System Status
+        </a>
+        <a href="#rawSection">
+            <!-- Brackets icon -->
+            <svg class="icon-18 icon-muted" viewBox="0 0 24 24" fill="none">
+                <path d="M7 4L3 8l4 4M17 4l4 4-4 4" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Raw Data
+        </a>
+    </nav>
 
-    <div class="container">
+    <div class="sb-footer">
+        v2.0 • Built with FastAPI, PostgreSQL, GPT-4, pgvector
+    </div>
+</aside>
 
-        <!-- Hero Panel -->
-        <div class="panel">
-            <div class="hero">
-                <h1>Healthcare Cost Navigator</h1>
-                <p>Discover providers, analyze costs, and ask questions in natural language.</p>
-            </div>
-            <div class="panel-body">
-                <!-- AI Assistant -->
-                <div class="section-block">
-                    <div class="panel-header" style="border:0; padding:0 0 14px;">
-                        <div class="icon">🤖</div>
-                        <div>
-                            <div class="panel-title">AI Assistant - Natural Language Queries</div>
-                            <div class="panel-subtitle">Ask about hospital costs, quality ratings, DRGs, and more.</div>
-                        </div>
+<!-- Topbar -->
+<header class="topbar">
+    <div style="display:flex; align-items:center; gap:10px;">
+        <!-- Page title icon -->
+        <svg class="icon-20 icon-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M12 3l7 4v6c0 2.8-1.6 5.4-4.1 6.7L12 22l-2.9-1.3C6.6 19.4 5 16.8 5 14V7l7-4z" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div>
+            <div style="font-weight:800; letter-spacing:.3px;">Main Dashboard</div>
+            <div style="font-size:12px; color:var(--muted);">NL to SQL • Search • Analytics</div>
+        </div>
+    </div>
+    <div class="top-actions">
+        <button class="btn btn-outline" onclick="checkHealth()">
+            <span class="status-indicator status-success"></span>Check API
+        </button>
+        <button class="btn btn-outline" onclick="getTemplateStats()">Templates</button>
+        <button class="btn btn-primary" onclick="document.getElementById('aiQuestion').focus()">
+            Ask AI
+        </button>
+    </div>
+</header>
+
+<!-- Main content -->
+<main class="main">
+    <div class="page-grid">
+        <!-- Left column: AI + Providers -->
+        <div class="grid" id="aiSection">
+            <!-- AI Assistant Card -->
+            <section class="card">
+                <div class="card-header">
+                    <!-- Spark icon -->
+                    <svg class="icon-20 icon-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M12 2v6M12 16v6M22 12h-6M8 12H2M17 7l-5 5 5 5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div>
+                        <div class="card-title">AI Assistant - Natural Language Queries</div>
+                        <div class="card-sub">Ask about hospital costs, quality ratings, DRGs, and procedures.</div>
                     </div>
-    
+                </div>
+                <div class="card-body">
                     <div class="grid">
                         <div>
                             <label for="aiQuestion">Your Question</label>
@@ -377,14 +492,30 @@
                         <div class="example-links">
                             <h3>Example questions</h3>
                             <ul>
-                                <li><a href="#" onclick="setQuestion('Who has the cheapest hip replacement in NY?')">Who has the cheapest hip replacement in NY?</a></li>
-                                <li><a href="#" onclick="setQuestion('Find highest rated hospitals for heart surgery')">Find highest rated hospitals for heart surgery</a></li>
-                                <li><a href="#" onclick="setQuestion('What are the most expensive procedures in California?')">What are the most expensive procedures in California?</a></li>
-                                <li><a href="#" onclick="setQuestion('Show me volume leaders for DRG 470')">Show me volume leaders for DRG 470</a></li>
-                                <li><a href="#" onclick="setQuestion('Which hospitals have ratings above 8 in Florida?')">Which hospitals have ratings above 8 in Florida?</a></li>
+                                <li><a href="#" onclick="setQuestion('Who has the cheapest hip replacement in NY?')">
+                                    <!-- Arrow right -->
+                                    <svg class="icon-16 icon-muted" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    Who has the cheapest hip replacement in NY?
+                                </a></li>
+                                <li><a href="#" onclick="setQuestion('Find highest rated hospitals for heart surgery')">
+                                    <svg class="icon-16 icon-muted" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    Find highest rated hospitals for heart surgery
+                                </a></li>
+                                <li><a href="#" onclick="setQuestion('What are the most expensive procedures in California?')">
+                                    <svg class="icon-16 icon-muted" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    What are the most expensive procedures in California?
+                                </a></li>
+                                <li><a href="#" onclick="setQuestion('Show me volume leaders for DRG 470')">
+                                    <svg class="icon-16 icon-muted" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    Show me volume leaders for DRG 470
+                                </a></li>
+                                <li><a href="#" onclick="setQuestion('Which hospitals have ratings above 8 in Florida?')">
+                                    <svg class="icon-16 icon-muted" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 5l7 7-7 7" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                    Which hospitals have ratings above 8 in Florida?
+                                </a></li>
                             </ul>
                         </div>
-    
+
                         <div class="results-container" id="aiResults">
                             <h3 class="results-header">AI Response</h3>
                             <div id="aiAnswer"></div>
@@ -392,169 +523,176 @@
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
-    
-        <!-- Provider Search -->
-        <section class="panel">
-            <div class="panel-header">
-                <div class="icon">🏥</div>
-                <div>
-                    <div class="panel-title">Provider Search</div>
-                    <div class="panel-subtitle">Filter by location, DRG, rating, and cost.</div>
-                </div>
-            </div>
-            <div class="panel-body">
-                <div class="section-block">
-                    <h3 style="margin: 0 0 10px;">Search by Criteria</h3>
-                    <form onsubmit="searchProviders(event)">
-                        <div class="grid grid-2">
-                            <div>
-                                <label for="searchState">State</label>
-                                <input type="text" id="searchState" placeholder="NY" maxlength="2">
-                            </div>
-                            <div>
-                                <label for="searchCity">City</label>
-                                <input type="text" id="searchCity" placeholder="New York">
-                            </div>
-                            <div>
-                                <label for="searchDrg">DRG Code</label>
-                                <input type="text" id="searchDrg" placeholder="470">
-                            </div>
-                            <div>
-                                <label for="searchRating">Minimum Rating</label>
-                                <input type="number" id="searchRating" min="1" max="10" step="0.1" placeholder="8.0">
-                            </div>
-                            <div>
-                                <label for="searchCost">Maximum Cost</label>
-                                <input type="number" id="searchCost" placeholder="100000">
-                            </div>
-                            <div>
-                                <label for="searchLimit">Results Limit</label>
-                                <input type="number" id="searchLimit" value="10" min="1" max="50">
-                            </div>
-                        </div>
-                        <div class="quick-actions" style="margin-top: 10px;">
-                            <button type="submit" class="btn btn-primary">Search Providers</button>
-                            <button type="button" class="btn btn-secondary" onclick="clearProviderSearch()">Clear Search</button>
-                        </div>
-                    </form>
-                </div>
-    
-                <div class="section-block">
-                    <h3 style="margin: 0 0 10px;">Quick Searches</h3>
-                    <div class="quick-actions">
-                        <button class="btn btn-outline" onclick="getCheapestProviders('470')">Cheapest DRG 470 (Hip Replacement)</button>
-                        <button class="btn btn-outline" onclick="getCheapestProviders('191')">Cheapest DRG 191 (Heart Surgery)</button>
-                        <button class="btn btn-outline" onclick="getHighestRated()">Highest Rated Providers</button>
-                        <button class="btn btn-outline" onclick="getVolumeLeaders('470')">Volume Leaders DRG 470</button>
-                    </div>
-                </div>
-    
-                <div class="section-block">
-                    <div class="results-container" id="providerResults">
-                        <h3 class="results-header">Provider Results</h3>
-                        <div id="providerList"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    
-        <!-- Cost Analysis -->
-        <section class="panel">
-            <div class="panel-header">
-                <div class="icon">💰</div>
-                <div>
-                    <div class="panel-title">Cost Analysis</div>
-                    <div class="panel-subtitle">Analyze distribution and extremes for a DRG.</div>
-                </div>
-            </div>
-            <div class="panel-body">
-                <div class="grid grid-2">
-                    <div>
-                        <label for="analysisCode">DRG Code</label>
-                        <input type="text" id="analysisCode" placeholder="470" maxlength="10">
-                    </div>
-                    <div>
-                        <label for="analysisState">State (optional)</label>
-                        <input type="text" id="analysisState" placeholder="NY" maxlength="2">
-                    </div>
-                </div>
-                <div class="quick-actions" style="margin-top: 12px;">
-                    <button class="btn btn-primary" onclick="analyzeCosts()">Analyze Costs</button>
-                </div>
-    
-                <div class="results-container" id="costAnalysis" style="margin-top: 12px;">
-                    <h3 class="results-header">Cost Analysis Results</h3>
-                    <div id="costDetails"></div>
-                </div>
-            </div>
-        </section>
-    
-        <!-- System Status -->
-        <section class="panel">
-            <div class="panel-header">
-                <div class="icon">📊</div>
-                <div>
-                    <div class="panel-title">System Status</div>
-                    <div class="panel-subtitle">API health and template usage.</div>
-                </div>
-            </div>
-            <div class="panel-body">
-                <div class="quick-actions">
-                    <button class="btn btn-outline" onclick="checkHealth()">
-                        <span class="status-indicator status-success"></span>Check API Health
-                    </button>
-                    <button class="btn btn-outline" onclick="getTemplateStats()">Template Statistics</button>
-                </div>
-    
-                <div class="grid" style="margin-top: 12px;">
-                    <div class="results-container" id="systemStatus">
-                        <div id="healthStatus"></div>
-                        <div id="templateStats" style="margin-top: 10px;"></div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    
-        <!-- Raw Data Viewer -->
-        <section class="panel">
-            <div class="panel-header">
-                <div class="icon">🔍</div>
-                <div>
-                    <div class="panel-title">Raw Data Viewer</div>
-                    <div class="panel-subtitle">Inspect the latest API response payload.</div>
-                </div>
-            </div>
-            <div class="panel-body">
-                <p style="margin: 0 0 10px; color: var(--muted);">View raw JSON responses for debugging and analysis.</p>
-                <button class="btn btn-secondary" onclick="toggleRawData()">Toggle Raw Data Display</button>
-                <div id="rawDataContainer" style="display: none; margin-top: 12px;">
-                    <div class="results-container">
-                        <h3 class="results-header">Last API Response</h3>
-                        <pre id="rawData"></pre>
-                    </div>
-                </div>
-            </div>
-        </section>
-    
-        <!-- Footer -->
-        <div class="footer">
-            <p><strong>Healthcare Cost Navigator v2.0</strong> — AI-Powered Hospital Search Platform</p>
-            <p>Built with FastAPI, PostgreSQL, OpenAI GPT-4, and pgvector</p>
-            <p>Features: Natural Language Processing, Template Matching, Vector Search, DRG Lookup</p>
-        </div>
-    </div>
-    
-    <!-- Loading indicator -->
-    <div id="loading">
-        <div class="loading-card">
-            <div class="spinner"></div>
-            <h3>Loading...</h3>
-        </div>
-    </div>
-    
-    <script src="app.js"></script>
-    <script src="ws.js"></script>
+            </section>
 
-</body> </html>
+            <!-- Provider Search Card -->
+            <section class="card" id="providerSection">
+                <div class="card-header">
+                    <!-- Hospital icon -->
+                    <svg class="icon-20 icon-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M4 20V7a2 2 0 012-2h12a2 2 0 012 2v13" stroke-width="1.6" stroke-linecap="round"/>
+                        <path d="M9 20V9h6v11" stroke-width="1.6" stroke-linecap="round"/>
+                        <path d="M3 20h18" stroke-width="1.6" stroke-linecap="round"/>
+                    </svg>
+                    <div>
+                        <div class="card-title">Provider Search</div>
+                        <div class="card-sub">Filter by location, DRG, rating, and cost.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="section-block">
+                        <h3 style="margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.35px; color:var(--muted);">Search by Criteria</h3>
+                        <form onsubmit="searchProviders(event)">
+                            <div class="grid grid-3">
+                                <div>
+                                    <label for="searchState">State</label>
+                                    <input type="text" id="searchState" placeholder="NY" maxlength="2">
+                                </div>
+                                <div>
+                                    <label for="searchCity">City</label>
+                                    <input type="text" id="searchCity" placeholder="New York">
+                                </div>
+                                <div>
+                                    <label for="searchDrg">DRG Code</label>
+                                    <input type="text" id="searchDrg" placeholder="470">
+                                </div>
+                                <div>
+                                    <label for="searchRating">Minimum Rating</label>
+                                    <input type="number" id="searchRating" min="1" max="10" step="0.1" placeholder="8.0">
+                                </div>
+                                <div>
+                                    <label for="searchCost">Maximum Cost</label>
+                                    <input type="number" id="searchCost" placeholder="100000">
+                                </div>
+                                <div>
+                                    <label for="searchLimit">Results Limit</label>
+                                    <input type="number" id="searchLimit" value="10" min="1" max="50">
+                                </div>
+                            </div>
+                            <div class="quick-actions" style="margin-top: 10px;">
+                                <button type="submit" class="btn btn-primary">Search Providers</button>
+                                <button type="button" class="btn btn-secondary" onclick="clearProviderSearch()">Clear Search</button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="section-block">
+                        <h3 style="margin:0 0 10px; font-size:13px; text-transform:uppercase; letter-spacing:.35px; color:var(--muted);">Quick Searches</h3>
+                        <div class="quick-actions">
+                            <button class="btn btn-outline" onclick="getCheapestProviders('470')">Cheapest DRG 470 (Hip Replacement)</button>
+                            <button class="btn btn-outline" onclick="getCheapestProviders('191')">Cheapest DRG 191 (Heart Surgery)</button>
+                            <button class="btn btn-outline" onclick="getHighestRated()">Highest Rated Providers</button>
+                            <button class="btn btn-outline" onclick="getVolumeLeaders('470')">Volume Leaders DRG 470</button>
+                        </div>
+                    </div>
+
+                    <div class="section-block">
+                        <div class="results-container" id="providerResults">
+                            <h3 class="results-header">Provider Results</h3>
+                            <div id="providerList"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Right column: Cost Analysis + Status + Raw -->
+        <div class="grid">
+            <!-- Cost Analysis -->
+            <section class="card" id="analysisSection">
+                <div class="card-header">
+                    <!-- Chart icon -->
+                    <svg class="icon-20 icon-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M4 19V5M4 19h16" stroke-width="1.6" stroke-linecap="round"/>
+                        <path d="M8 15l3-3 3 2 4-6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div>
+                        <div class="card-title">Cost Analysis</div>
+                        <div class="card-sub">Analyze distribution and extremes for a DRG.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="grid grid-2">
+                        <div>
+                            <label for="analysisCode">DRG Code</label>
+                            <input type="text" id="analysisCode" placeholder="470" maxlength="10">
+                        </div>
+                        <div>
+                            <label for="analysisState">State (optional)</label>
+                            <input type="text" id="analysisState" placeholder="NY" maxlength="2">
+                        </div>
+                    </div>
+                    <div class="quick-actions" style="margin-top: 12px;">
+                        <button class="btn btn-primary" onclick="analyzeCosts()">Analyze Costs</button>
+                    </div>
+
+                    <div class="results-container" id="costAnalysis" style="margin-top: 12px;">
+                        <h3 class="results-header">Cost Analysis Results</h3>
+                        <div id="costDetails"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- System Status -->
+            <section class="card" id="statusSection">
+                <div class="card-header">
+                    <!-- Pulse icon -->
+                    <svg class="icon-20 icon-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M3 12h4l2-4 4 8 2-4h6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div>
+                        <div class="card-title">System Status</div>
+                        <div class="card-sub">API health and template usage.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="quick-actions">
+                        <button class="btn btn-outline" onclick="checkHealth()">
+                            <span class="status-indicator status-success"></span>Check API Health
+                        </button>
+                        <button class="btn btn-outline" onclick="getTemplateStats()">Template Statistics</button>
+                    </div>
+
+                    <div class="grid" style="margin-top: 12px;">
+                        <div class="results-container" id="systemStatus">
+                            <div id="healthStatus"></div>
+                            <div id="templateStats" style="margin-top: 10px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Raw Data Viewer -->
+            <section class="card" id="rawSection">
+                <div class="card-header">
+                    <!-- Code brackets icon -->
+                    <svg class="icon-20 icon-primary" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M8 4L3 9l5 5M16 4l5 5-5 5" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div>
+                        <div class="card-title">Raw Data Viewer</div>
+                        <div class="card-sub">Inspect the latest API response payload.</div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p style="margin: 0 0 10px; color: var(--muted);">View raw JSON responses for debugging and analysis.</p>
+                    <button class="btn btn-secondary" onclick="toggleRawData()">Toggle Raw Data Display</button>
+                    <div id="rawDataContainer" style="display: none; margin-top: 12px;">
+                        <div class="results-container">
+                            <h3 class="results-header">Last API Response</h3>
+                            <pre id="rawData"></pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Footer -->
+            <div class="footer">
+                <p><strong>Healthcare Cost Navigator v2.0</strong> — AI-Powered Hospital Search Platform</p>
+                <p>Built with FastAPI, PostgreSQL, OpenAI GPT-4, and pgvector</p>
+                <p>Features: Natural Language Processing, Template Matching, Vector Search, DRG Lookup</p>
+            </div>
+        </div>
+    </div>
+</main>
+</div> <!-- Loading indicator --> <div id="loading"> <div class="loading-card"> <div class="spinner"></div> <h3>Loading...</h3> </div> </div> <script src="app.js"></script> <script src="ws.js"></script> </body> </html>

@@ -7,6 +7,7 @@ import os
 from typing import List, Dict, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+import re
 from dataclasses import dataclass
 
 from ..utils.template_loader import TemplateService, ParameterMapping
@@ -80,6 +81,9 @@ class EnhancedAIService:
         user_query: str,
         use_template_matching: bool = True
     ) -> QueryResult:
+        # quick multi-state detection (e.g. "NY or CA")
+        state_codes = self._extract_state_codes(user_query)
+        
         """
         Process natural language query with structured parsing and template matching
         
@@ -97,6 +101,16 @@ class EnhancedAIService:
             # Step 1: Parse query into structured parameters
             structured_params = await self.structured_parser.parse_query(user_query)
             logger.info(f"Structured parsing result: {structured_params}")
+            # If question mentions multiple state codes → run special helper
+            if len(state_codes) >= 2:
+                multi_state_result = await self._execute_cheapest_multi_state(
+                    session,
+                    structured_params.procedure or structured_params.drg_code or "",
+                    state_codes,
+                    structured_params.limit or 10
+                )
+                if multi_state_result.success and multi_state_result.results:
+                    return multi_state_result
             
             # Step 2: Try template matching with structured parameters
             if use_template_matching:
@@ -403,10 +417,51 @@ class EnhancedAIService:
                 )
             
             return " ".join(sql_parts)
-            
         except Exception as e:
             logger.error(f"Structured SQL generation failed: {e}")
             return None
+
+    def _extract_state_codes(self, text: str) -> list[str]:
+        """Return a list of 2-letter state codes appearing in the text."""
+        potential = re.findall(r"\b([A-Z]{2})\b", text.upper())
+        valid = {
+            'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+            'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD',
+            'TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'
+        }
+        seen = []
+        for code in potential:
+            if code in valid and code not in seen:
+                seen.append(code)
+        return seen
+
+    async def _execute_cheapest_multi_state(self, session: AsyncSession, procedure_term: str, states: list[str], limit: int = 10) -> QueryResult:
+        """Execute cheapest provider per state query without relying on template catalog."""
+        drg_code = await self._lookup_drg_code(session, procedure_term)
+        where_parts = []
+        if drg_code:
+            where_parts.append(f"d.drg_code = '{drg_code}'")
+        elif procedure_term:
+            safe = procedure_term.replace("'", "''")
+            where_parts.append(f"d.drg_description ILIKE '%{safe}%'")
+        states_csv = ",".join([f"'{s}'" for s in states])
+        where_parts.append(f"p.provider_state IN ({states_csv})")
+        where_clause = " AND ".join(where_parts)
+        sql = f"""
+            SELECT p.provider_state,
+                   MIN(pp.average_covered_charges) AS cheapest_cost,
+                   FIRST_VALUE(p.provider_name) OVER (PARTITION BY p.provider_state ORDER BY pp.average_covered_charges) AS cheapest_provider,
+                   FIRST_VALUE(d.drg_description) OVER (PARTITION BY p.provider_state ORDER BY pp.average_covered_charges) AS procedure
+            FROM provider_procedures pp
+            JOIN providers p ON p.provider_id = pp.provider_id
+            JOIN drg_procedures d ON d.drg_code = pp.drg_code
+            WHERE {where_clause}
+            GROUP BY p.provider_state
+            ORDER BY cheapest_cost
+            LIMIT {limit};"""
+        success, msg, rows = await self._execute_sql_safely(session, sql)
+        return QueryResult(success=success, message=msg, sql_query=sql, results=rows)
+
     
     async def _lookup_drg_code(self, session: AsyncSession, procedure_description: str) -> Optional[str]:
         """Look up DRG code from procedure description using database trigram search"""
