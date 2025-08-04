@@ -346,6 +346,32 @@ class EnhancedAIService:
                 sql_parts.append("ORDER BY avg_cost DESC")
                 sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
                 
+            elif structured_params.query_type == QueryType.STATE_COMPARISON:
+                sql_parts = [
+                    "SELECT pp.provider_state, MIN(pp.average_covered_charges) AS cheapest_cost,",
+                    "       FIRST_VALUE(p.provider_name) OVER w AS cheapest_provider",
+                    "FROM provider_procedures pp",
+                    "JOIN providers p ON p.provider_id = pp.provider_id",
+                    "JOIN drg_procedures d ON d.drg_code = pp.drg_code"
+                ]
+
+                where_conditions = []
+                if structured_params.procedure:
+                    where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
+
+                # Use IN clause for multiple states
+                if structured_params.states and len(structured_params.states) > 0:
+                    states_list = ",".join([f"'{s}'" for s in structured_params.states])
+                    where_conditions.append(f"pp.provider_state IN ({states_list})")
+
+                if where_conditions:
+                    sql_parts.append("WHERE " + " AND ".join(where_conditions))
+
+                sql_parts.append("WINDOW w AS (PARTITION BY pp.provider_state ORDER BY pp.average_covered_charges)")
+                sql_parts.append("GROUP BY pp.provider_state")
+                sql_parts.append("ORDER BY cheapest_cost")
+                sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
+
             elif structured_params.query_type == QueryType.HIGHEST_RATED:
                 # Note: For ratings, we still need to join providers table
                 sql_parts = ["SELECT p.provider_name, pr.overall_rating, p.provider_city, p.provider_state"]
@@ -652,7 +678,9 @@ class EnhancedAIService:
                 intent_parts.append("nationwide")
         
         # Add geographic scope
-        if structured_params.state:
+        if structured_params.states and len(structured_params.states) > 1:
+            intent_parts.append("state_comparison")
+        elif structured_params.state:
             intent_parts.append("state_specific")
         elif not structured_params.city and not structured_params.zip_code:
             intent_parts.append("nationwide")

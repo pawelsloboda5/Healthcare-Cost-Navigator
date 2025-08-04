@@ -15,6 +15,7 @@ class QueryType(Enum):
     HIGHEST_RATED = "highest_rated" 
     COST_COMPARISON = "cost_comparison"
     VOLUME_ANALYSIS = "volume_analysis"
+    STATE_COMPARISON = "state_comparison"
 
 @dataclass
 class StructuredQuery:
@@ -25,6 +26,7 @@ class StructuredQuery:
     state: Optional[str] = None
     city: Optional[str] = None
     zip_code: Optional[str] = None
+    states: Optional[List[str]] = None  # plural list for comparisons
     min_rating: Optional[float] = None
     max_cost: Optional[float] = None
     limit: Optional[int] = None
@@ -75,8 +77,13 @@ class StructuredQueryParser:
                             "description": "City name (e.g., 'Los Angeles', 'Miami')"
                         },
                         "zip_code": {
-                            "type": "string",
-                            "description": "ZIP code if mentioned"
+                        "type": "string",
+                        "description": "ZIP code if mentioned"
+                        },
+                        "states": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of state codes for comparison (e.g., ['NY','CA'])"
                         },
                         "min_rating": {
                             "type": "number",
@@ -122,6 +129,8 @@ class StructuredQueryParser:
                 # Normalize state names
                 if params.get("state"):
                     params["state"] = self._normalize_state(params["state"])
+                if params.get("states"):
+                    params["states"] = [self._normalize_state(s) for s in params["states"]]
                 
                 # Set default limit
                 if not params.get("limit"):
@@ -134,6 +143,7 @@ class StructuredQueryParser:
                     state=params.get("state"),
                     city=params.get("city"),
                     zip_code=params.get("zip_code"),
+                    states=params.get("states"),
                     min_rating=params.get("min_rating"),
                     max_cost=params.get("max_cost"),
                     limit=params.get("limit", 10)
