@@ -38,6 +38,12 @@ This package concentrates the backend business logic: NL→SQL orchestration, pr
   - Multi‑state helper supports queries mentioning multiple states inline (e.g., “NY vs CA” / “NY or CA”).
   - Prefer `pp.provider_state` for filters; join to `providers p` only when provider display fields are required.
 
+## Recent changes
+- Ratings path now supports multi-state comparisons and nationwide queries without procedures. Structured SQL adds `p.provider_state IN (...)` when `states` present.
+- Multi-state cheapest helper uses CTE + ROW_NUMBER to avoid grouping errors.
+- Template constants extraction now correctly maps `IN ($n,$n+1,...)` by inspecting only placeholders inside the parentheses and ensures `LIMIT` stays numeric.
+- Parser preserves `highest_rated` intent for multi-state and uses text cues to override misclassification.
+
 - **Example: “Who has the most expensive procedures CA or NY?”**
   - If no specific procedure is mentioned, we interpret “procedures” as “all procedures” and compare by aggregate per state.
   - Exemplary SQL pattern (avg cost comparison across two states):

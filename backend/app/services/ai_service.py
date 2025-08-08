@@ -285,21 +285,24 @@ class EnhancedAIService:
                         logger.warning("Template requires state parameter but none provided")
                         return []
                 constants.append(state_value)
-            elif "provider_state in (" in tmpl and param_placeholder in tmpl:
+            elif "provider_state in (" in tmpl:
                 # Handle multi-state IN ($n, $n+1, ...). Fill from structured_params.states.
                 if not structured_params.states or len(structured_params.states) == 0:
                     logger.warning("Template expects multiple states but none provided")
                     return []
-                # Determine index offset by counting how many earlier placeholders appear before this one
-                # Simple positional mapping: assume the IN($k,$k+1,...) starts at the first placeholder within the IN clause
-                # Compute the zero-based index within the IN group by subtracting the smallest placeholder in the group
-                in_placeholders = [int(p[1:]) for p in re.findall(r"\$\d+", tmpl[tmpl.find("provider_state in ("):])]
-                base = min(in_placeholders) if in_placeholders else param_num
-                state_index = param_num - base
-                if state_index < len(structured_params.states):
-                    constants.append(structured_params.states[state_index])
-                else:
-                    constants.append(structured_params.states[-1])
+                # Determine placeholders only within the parentheses of the IN (...) clause
+                start = tmpl.find("provider_state in (")
+                end = tmpl.find(")", start)
+                segment = tmpl[start:end] if start != -1 and end != -1 else tmpl[start:]
+                in_placeholders = [int(p[1:]) for p in re.findall(r"\$\d+", segment)]
+                if param_num in in_placeholders:
+                    base = min(in_placeholders)
+                    state_index = param_num - base
+                    if state_index < len(structured_params.states):
+                        constants.append(structured_params.states[state_index])
+                    else:
+                        constants.append(structured_params.states[-1])
+                    continue
                 
             elif f"provider_city ilike {param_placeholder}" in tmpl or f"p.provider_city ilike {param_placeholder}" in tmpl:
                 # This is a city parameter - return clean value for ILIKE mapping
@@ -413,14 +416,18 @@ class EnhancedAIService:
                 sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
 
             elif structured_params.query_type == QueryType.HIGHEST_RATED:
-                # Ratings: join providers + ratings; support multi-state comparisons
+                # Ratings: join providers + ratings; support nationwide or multi-state comparisons
                 sql_parts = [
-                    "SELECT p.provider_state, p.provider_name, pr.overall_rating, p.provider_city",
+                    "SELECT p.provider_name, pr.overall_rating, p.provider_city, p.provider_state",
                     "FROM providers p",
                     "JOIN provider_ratings pr ON p.provider_id = pr.provider_id",
                 ]
 
                 where_conditions = ["pr.overall_rating IS NOT NULL"]
+                if structured_params.procedure:
+                    sql_parts.append("JOIN provider_procedures pp ON p.provider_id = pp.provider_id")
+                    sql_parts.append("JOIN drg_procedures d ON pp.drg_code = d.drg_code")
+                    where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
                 if structured_params.state:
                     where_conditions.append("p.provider_state = '{}'".format(structured_params.state))
                 if structured_params.states and len(structured_params.states) > 0:

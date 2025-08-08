@@ -133,6 +133,9 @@ class TemplateService:
                     else:
                         replacement = constant
                         parameterized_sql = placeholder_re.sub(replacement, parameterized_sql)
+
+            # Ensure LIMIT is numeric (remove accidental quotes)
+            parameterized_sql = re.sub(r"limit\s+'(\d+)'", r"limit \1", parameterized_sql, flags=re.IGNORECASE)
             
             logger.debug(f"Parameter mapping - Template: {template_sql}, "
                         f"Result: {parameterized_sql}, "

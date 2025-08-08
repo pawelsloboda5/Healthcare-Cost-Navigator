@@ -145,6 +145,11 @@ class StructuredQueryParser:
                     if params.get("query_type") != "highest_rated":
                         params["query_type"] = "state_comparison"
 
+                # Ratings override by text cue (extra guard)
+                text_lower = str(user_query).lower()
+                if any(kw in text_lower for kw in ["highest rated", "top rated", "best rated"]):
+                    params["query_type"] = "highest_rated"
+
                 # Set default limit
                 if not params.get("limit"):
                     params["limit"] = 10

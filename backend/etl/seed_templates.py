@@ -260,6 +260,20 @@ class TemplateSeeder:
             },
             {
                 "raw_sql": """
+                    SELECT p.provider_name,
+                           pr.overall_rating,
+                           p.provider_city,
+                           p.provider_state
+                    FROM providers p
+                    JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    WHERE pr.overall_rating IS NOT NULL
+                    ORDER BY pr.overall_rating DESC
+                    LIMIT $1;
+                """,
+                "comment": "Highest rated providers nationwide (no procedure)",
+            },
+            {
+                "raw_sql": """
                     SELECT p.provider_state,
                            p.provider_name,
                            pr.overall_rating,

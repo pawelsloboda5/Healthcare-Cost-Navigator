@@ -8,6 +8,7 @@
     - Maps `$n` placeholders with correct quoting. Special‑cases `ILIKE`/`LIKE` to expand wildcards; short numerics default to string (for DRG codes).
   - `validate_and_execute_template(session, template_match, user_constants, max_results)`
     - Builds executable SQL, validates safety, adds LIMIT, executes via SQLAlchemy `text()`.
+  - Post-processing ensures `LIMIT` is numeric (quotes removed) to prevent driver errors.
   - `learn_from_successful_query(...)`
     - Normalizes SQL and conditionally inserts into `template_catalog` if not near‑duplicate.
   - `get_template_suggestions(session, user_query, limit)`
