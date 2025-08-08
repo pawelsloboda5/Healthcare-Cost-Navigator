@@ -1,45 +1,42 @@
-# Healthcare Cost Navigator – ORM Models
+### Healthcare Cost Navigator – ORM Models
 
-All models inherit from `Base` in `core.database`.  They represent the **source-of-truth schema** for Postgres.
+## Purpose
+Defines the relational schema for Postgres. All models inherit from `Base` in `core.database` and align with `etl/init.sql` bootstrap.
 
-## Entity Overview
-### Provider
-* PK: `provider_id` (CMS ID, string)
-* Geo & address fields plus RUCA meta.
-* Spatial `location GEOPOINT` enables distance queries (`gist` index).
+## Entities
+- `Provider`
+  - `provider_id` (PK), name, address, city, `provider_state`, ZIP, optional RUCA and `location` (GEOMETRY Point 4326).
+  - Indexes: `idx_provider_zip`, `idx_provider_state`, GIST on `location`.
 
-### DRGProcedure
-* PK: `drg_code`
-* `drg_description` plus **OpenAI 1536-dim embedding** for semantic search.
+- `DRGProcedure`
+  - `drg_code` (PK), `drg_description`, `embedding Vector(1536)` for semantic search.
+  - Index: trigram GIN on `drg_description`; vector IVFFlat index created post‑load.
 
-### ProviderProcedure (bridge)
-* PK: surrogate `id`.
-* FK → Provider, DRGProcedure.
-* Denormalised `provider_state` column to avoid joins during geo filters → critical for query performance.
+- `ProviderProcedure`
+  - Surrogate `id`, `provider_id` FK, `drg_code` FK.
+  - Measures: `total_discharges`, `average_covered_charges`, `average_total_payments`, `average_medicare_payments`.
+  - Denormalized `provider_state` to avoid join on hot paths.
+  - Indexes: (`provider_id`, `drg_code`), `average_covered_charges`, `drg_code`.
 
-### ProviderRating
-* 1-to-1 optional rating snapshot per provider.
+- `ProviderRating`
+  - Surrogate `id`, `provider_id` FK.
+  - Ratings: `overall_rating`, `quality_rating`, `safety_rating`, `patient_experience_rating`.
+  - Indexes on `provider_id` and `overall_rating`.
 
-### CSVColumnMapping
-Tracks ETL metadata – which raw CSV column maps to which model field / table.
+- `CSVColumnMapping`
+  - ETL dictionary: `csv_column_name` → `normalized_field_name`, `table_name`, `data_type`, `description`.
 
-### TemplateCatalog
-Vector-searchable SQL template store (`embedding vector`) driving RAG/template matching.
+- `TemplateCatalog`
+  - Stores NL→SQL templates: `canonical_sql`, `raw_sql`, `embedding`, `comment`, timestamps.
+  - Indexes on `canonical_sql`, `created_at`; vector index created after seeding.
 
-## Indexing & Performance Notes
-* Multiple GIN / trigram indices for full-text search (DRG descriptions).
-* `provider_location` GIST index for spatial queries.
-* Composite indices on (`provider_id`, `drg_code`) for cost lookups.
-
-## Data Relationships
+## Relationships
 ```
 Provider 1––* ProviderProcedure *––1 DRGProcedure
 Provider 1––* ProviderRating
 ```
-All FK constraints are **on delete cascade** (default SQLAlchemy), ensuring orphan cleanup.
 
-## Serialisation Rules
-Numeric fields (`Numeric`, `Integer`) are read as `Decimal/Decimal128`; service layer casts to `float/int` before JSON.
-
-## Migration Strategy
-Schema is managed via Alembic (see `alembic/versions`).  Ensure new columns have accompanying indices & ETL updates.
+## Notes
+- Services cast numeric DB values to JSON‑safe `float`/`int`.
+- Alembic migrations add performance optimizations and materialized views when applicable.
+- The denormalized `provider_state` is essential for fast state filters and multi‑state comparisons.

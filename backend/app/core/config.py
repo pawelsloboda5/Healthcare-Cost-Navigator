@@ -2,7 +2,6 @@
 Configuration settings for Healthcare Cost Navigator
 """
 import os
-from typing import Optional
 
 class Settings:
     """Application settings and configuration"""
@@ -37,6 +36,8 @@ class Settings:
     # Safety settings
     MAX_SQL_COMPLEXITY: int = 50
     ENABLE_TEMPLATE_LEARNING: bool = True
+    # NL→SQL generation fallback
+    ENABLE_RAG: bool = os.getenv("ENABLE_RAG", "false").lower() == "true"
     
     # Logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")

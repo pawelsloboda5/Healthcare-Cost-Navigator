@@ -260,6 +260,21 @@ class TemplateSeeder:
             },
             {
                 "raw_sql": """
+                    SELECT p.provider_state,
+                           p.provider_name,
+                           pr.overall_rating,
+                           p.provider_city
+                    FROM providers p
+                    JOIN provider_ratings pr ON p.provider_id = pr.provider_id
+                    WHERE pr.overall_rating IS NOT NULL
+                      AND p.provider_state IN ($1, $2)
+                    ORDER BY pr.overall_rating DESC
+                    LIMIT $3;
+                """,
+                "comment": "Highest rated providers across two states",
+            },
+            {
+                "raw_sql": """
                     SELECT p.provider_name,
                            pr.overall_rating,
                            pr.quality_rating,
@@ -402,6 +417,40 @@ class TemplateSeeder:
                     LIMIT $4;
                 """,
                 "comment": "Cheapest providers for procedure across multiple states",
+            },
+            # ───────────────────────────────────────────────────────────────
+            # NEW: MOST EXPENSIVE across two states (aggregate)
+            # ───────────────────────────────────────────────────────────────
+            {
+                "raw_sql": """
+                    SELECT pp.provider_state,
+                           AVG(pp.average_covered_charges) AS avg_cost
+                    FROM provider_procedures pp
+                    WHERE pp.provider_state IN ($1, $2)
+                    GROUP BY pp.provider_state
+                    ORDER BY avg_cost DESC
+                    LIMIT 2;
+                """,
+                "comment": "Compare average procedure costs between two states (most expensive first)",
+            },
+            # ───────────────────────────────────────────────────────────────
+            # NEW: MOST EXPENSIVE for a specific procedure across two states
+            # ───────────────────────────────────────────────────────────────
+            {
+                "raw_sql": """
+                    SELECT pp.provider_state,
+                           AVG(pp.average_covered_charges) AS avg_cost,
+                           MIN(pp.average_covered_charges) AS min_cost,
+                           MAX(pp.average_covered_charges) AS max_cost
+                    FROM provider_procedures pp
+                    JOIN drg_procedures d ON d.drg_code = pp.drg_code
+                    WHERE d.drg_description ILIKE $1
+                      AND pp.provider_state IN ($2, $3)
+                    GROUP BY pp.provider_state
+                    ORDER BY avg_cost DESC
+                    LIMIT 2;
+                """,
+                "comment": "Most expensive state among two for a given procedure (uses description ILIKE)",
             },
             
             # ═══════════════════════════════════════════════════════════════

@@ -4,3 +4,5 @@
 .docker-compose.yml
 /data
 /data/medicare-data-raw.csv
+.env.prod
+docker-compose.prod.yml

@@ -10,10 +10,11 @@ import logging
 import re
 from dataclasses import dataclass
 
-from ..utils.template_loader import TemplateService, ParameterMapping
+from ..utils.template_loader import TemplateService
 from ..utils.sql_normalizer import SQLNormalizer
 from ..utils.vector_search import TemplateMatch
 from .structured_query_parser import StructuredQueryParser, StructuredQuery, QueryType
+from ..core.config import settings
 from .drg_lookup import drg_code_from_phrase
 
 logger = logging.getLogger(__name__)
@@ -101,12 +102,16 @@ class EnhancedAIService:
             # Step 1: Parse query into structured parameters
             structured_params = await self.structured_parser.parse_query(user_query)
             logger.info(f"Structured parsing result: {structured_params}")
-            # If question mentions multiple state codes → run special helper
-            if len(state_codes) >= 2:
+            # Determine user intent early for correct routing (cheap vs expensive, etc.)
+            user_intent = self._extract_user_intent(user_query, structured_params)
+            # Prefer parser-extracted states over regex tokens (avoids picking up the word "or")
+            states = structured_params.states or state_codes
+            # If question mentions multiple state codes → run special helper ONLY for "cheapest" intent
+            if len(states) >= 2 and "cheapest" in user_intent:
                 multi_state_result = await self._execute_cheapest_multi_state(
                     session,
                     structured_params.procedure or structured_params.drg_code or "",
-                    state_codes,
+                    states,
                     structured_params.limit or 10
                 )
                 if multi_state_result.success and multi_state_result.results:
@@ -121,12 +126,14 @@ class EnhancedAIService:
                     template_result.structured_params = structured_params
                     return template_result
             
-            # Step 3: Fall back to structured RAG generation
-            rag_result = await self._generate_with_structured_rag(
-                session, user_query, structured_params
-            )
-            rag_result.structured_params = structured_params
-            return rag_result
+            # Step 3: Optional RAG fallback (configurable)
+            if settings.ENABLE_RAG:
+                rag_result = await self._generate_with_structured_rag(
+                    session, user_query, structured_params
+                )
+                rag_result.structured_params = structured_params
+                return rag_result
+            return QueryResult(success=False, message="No matching template found and RAG is disabled")
             
         except Exception as e:
             logger.error(f"Query processing failed: {e}")
@@ -168,7 +175,13 @@ class EnhancedAIService:
             )
             
             if not template_constants:
-                return QueryResult(success=False, message="Failed to extract template parameters")
+                # Fallback: use constants from normalization if count matches placeholders
+                import re
+                param_count = len(re.findall(r'\$\d+', template_match.raw_sql.lower()))
+                if len(constants) == param_count:
+                    template_constants = constants
+                else:
+                    return QueryResult(success=False, message="Failed to extract template parameters")
             
             # Execute the template with extracted constants
             success, final_sql, results = await self.template_service.validate_and_execute_template(
@@ -269,9 +282,24 @@ class EnhancedAIService:
                 if not state_value:
                     # Check if template comment suggests it's state-specific
                     if "in a state" in template_sql.lower():
-                        logger.warning(f"Template requires state parameter but none provided")
+                        logger.warning("Template requires state parameter but none provided")
                         return []
                 constants.append(state_value)
+            elif "provider_state in (" in tmpl and param_placeholder in tmpl:
+                # Handle multi-state IN ($n, $n+1, ...). Fill from structured_params.states.
+                if not structured_params.states or len(structured_params.states) == 0:
+                    logger.warning("Template expects multiple states but none provided")
+                    return []
+                # Determine index offset by counting how many earlier placeholders appear before this one
+                # Simple positional mapping: assume the IN($k,$k+1,...) starts at the first placeholder within the IN clause
+                # Compute the zero-based index within the IN group by subtracting the smallest placeholder in the group
+                in_placeholders = [int(p[1:]) for p in re.findall(r"\$\d+", tmpl[tmpl.find("provider_state in ("):])]
+                base = min(in_placeholders) if in_placeholders else param_num
+                state_index = param_num - base
+                if state_index < len(structured_params.states):
+                    constants.append(structured_params.states[state_index])
+                else:
+                    constants.append(structured_params.states[-1])
                 
             elif f"provider_city ilike {param_placeholder}" in tmpl or f"p.provider_city ilike {param_placeholder}" in tmpl:
                 # This is a city parameter - return clean value for ILIKE mapping
@@ -352,6 +380,9 @@ class EnhancedAIService:
                     where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
                 if structured_params.state:
                     where_conditions.append("pp.provider_state = '{}'".format(structured_params.state))
+                if structured_params.states and len(structured_params.states) > 0:
+                    states_list = ",".join([f"'{s}'" for s in structured_params.states])
+                    where_conditions.append(f"pp.provider_state IN ({states_list})")
                     
                 if where_conditions:
                     sql_parts.append("WHERE " + " AND ".join(where_conditions))
@@ -362,18 +393,14 @@ class EnhancedAIService:
                 
             elif structured_params.query_type == QueryType.STATE_COMPARISON:
                 sql_parts = [
-                    "SELECT pp.provider_state, MIN(pp.average_covered_charges) AS cheapest_cost,",
-                    "       FIRST_VALUE(p.provider_name) OVER w AS cheapest_provider",
-                    "FROM provider_procedures pp",
-                    "JOIN providers p ON p.provider_id = pp.provider_id",
-                    "JOIN drg_procedures d ON d.drg_code = pp.drg_code"
+                    "SELECT pp.provider_state, AVG(pp.average_covered_charges) AS avg_cost",
+                    "FROM drg_procedures d",
+                    "JOIN provider_procedures pp ON d.drg_code = pp.drg_code",
                 ]
 
                 where_conditions = []
                 if structured_params.procedure:
                     where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
-
-                # Use IN clause for multiple states
                 if structured_params.states and len(structured_params.states) > 0:
                     states_list = ",".join([f"'{s}'" for s in structured_params.states])
                     where_conditions.append(f"pp.provider_state IN ({states_list})")
@@ -381,32 +408,30 @@ class EnhancedAIService:
                 if where_conditions:
                     sql_parts.append("WHERE " + " AND ".join(where_conditions))
 
-                sql_parts.append("WINDOW w AS (PARTITION BY pp.provider_state ORDER BY pp.average_covered_charges)")
                 sql_parts.append("GROUP BY pp.provider_state")
-                sql_parts.append("ORDER BY cheapest_cost")
+                sql_parts.append("ORDER BY avg_cost DESC")
                 sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
 
             elif structured_params.query_type == QueryType.HIGHEST_RATED:
-                # Note: For ratings, we still need to join providers table
-                sql_parts = ["SELECT p.provider_name, pr.overall_rating, p.provider_city, p.provider_state"]
-                sql_parts.append("FROM providers p")
-                sql_parts.append("JOIN provider_ratings pr ON p.provider_id = pr.provider_id")
-                
-                if structured_params.procedure:
-                    sql_parts.append("JOIN provider_procedures pp ON p.provider_id = pp.provider_id")
-                    sql_parts.append("JOIN drg_procedures d ON pp.drg_code = d.drg_code")
-                
-                where_conditions = []
-                if structured_params.procedure:
-                    where_conditions.append("d.drg_description ILIKE '%{}%'".format(structured_params.procedure))
+                # Ratings: join providers + ratings; support multi-state comparisons
+                sql_parts = [
+                    "SELECT p.provider_state, p.provider_name, pr.overall_rating, p.provider_city",
+                    "FROM providers p",
+                    "JOIN provider_ratings pr ON p.provider_id = pr.provider_id",
+                ]
+
+                where_conditions = ["pr.overall_rating IS NOT NULL"]
                 if structured_params.state:
                     where_conditions.append("p.provider_state = '{}'".format(structured_params.state))
+                if structured_params.states and len(structured_params.states) > 0:
+                    states_list = ",".join([f"'{s}'" for s in structured_params.states])
+                    where_conditions.append(f"p.provider_state IN ({states_list})")
                 if structured_params.min_rating:
                     where_conditions.append("pr.overall_rating >= {}".format(structured_params.min_rating))
-                    
+
                 if where_conditions:
                     sql_parts.append("WHERE " + " AND ".join(where_conditions))
-                    
+
                 sql_parts.append("ORDER BY pr.overall_rating DESC")
                 sql_parts.append("LIMIT {}".format(structured_params.limit or 10))
                 
@@ -448,15 +473,28 @@ class EnhancedAIService:
         where_parts.append(f"p.provider_state IN ({states_csv})")
         where_clause = " AND ".join(where_parts)
         sql = f"""
-            SELECT p.provider_state,
-                   MIN(pp.average_covered_charges) AS cheapest_cost,
-                   FIRST_VALUE(p.provider_name) OVER (PARTITION BY p.provider_state ORDER BY pp.average_covered_charges) AS cheapest_provider,
-                   FIRST_VALUE(d.drg_description) OVER (PARTITION BY p.provider_state ORDER BY pp.average_covered_charges) AS procedure
-            FROM provider_procedures pp
-            JOIN providers p ON p.provider_id = pp.provider_id
-            JOIN drg_procedures d ON d.drg_code = pp.drg_code
-            WHERE {where_clause}
-            GROUP BY p.provider_state
+            WITH ranked AS (
+                SELECT 
+                    p.provider_state,
+                    pp.average_covered_charges,
+                    p.provider_name,
+                    d.drg_description,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY p.provider_state 
+                        ORDER BY pp.average_covered_charges ASC
+                    ) AS rn
+                FROM provider_procedures pp
+                JOIN providers p ON p.provider_id = pp.provider_id
+                JOIN drg_procedures d ON d.drg_code = pp.drg_code
+                WHERE {where_clause}
+            )
+            SELECT 
+                provider_state,
+                average_covered_charges AS cheapest_cost,
+                provider_name AS cheapest_provider,
+                drg_description AS procedure
+            FROM ranked
+            WHERE rn = 1
             ORDER BY cheapest_cost
             LIMIT {limit};"""
         success, msg, rows = await self._execute_sql_safely(session, sql)

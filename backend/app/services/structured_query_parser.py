@@ -30,6 +30,8 @@ class StructuredQuery:
     min_rating: Optional[float] = None
     max_cost: Optional[float] = None
     limit: Optional[int] = None
+    # Derived flags (not required by upstream callers, but useful for routing)
+    # cost_direction: "cheapest" | "expensive" | None – inferred in service
 
 class StructuredQueryParser:
     """Parse natural language to structured query parameters using OpenAI function calling"""
@@ -57,7 +59,13 @@ class StructuredQueryParser:
                     "properties": {
                         "query_type": {
                             "type": "string",
-                            "enum": ["cheapest_provider", "highest_rated", "cost_comparison", "volume_analysis"],
+                            "enum": [
+                                "cheapest_provider",
+                                "highest_rated",
+                                "cost_comparison",
+                                "volume_analysis",
+                                "state_comparison"
+                            ],
                             "description": "The type of healthcare query being made"
                         },
                         "procedure": {
@@ -132,6 +140,11 @@ class StructuredQueryParser:
                 if params.get("states"):
                     params["states"] = [self._normalize_state(s) for s in params["states"]]
                 
+                # Force STATE_COMPARISON when comparing multiple states, unless it's explicitly a ratings query
+                if params.get("states") and len(params["states"]) >= 2:
+                    if params.get("query_type") != "highest_rated":
+                        params["query_type"] = "state_comparison"
+
                 # Set default limit
                 if not params.get("limit"):
                     params["limit"] = 10

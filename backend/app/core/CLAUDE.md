@@ -1,25 +1,29 @@
-# Healthcare Cost Navigator – Core
+### Healthcare Cost Navigator – Core
 
 ## Purpose
-This package centralises application-wide infrastructure.
+Centralizes infrastructure: configuration and async database setup.
 
-### config.py
-* `Settings` class loads all runtime configuration solely from **environment variables** with sane defaults.
-  – `DATABASE_URL`, `OPENAI_API_KEY`, model names, CORS list, query limits, safety thresholds.
-* Instantiated once as `settings` and imported elsewhere – **do not** create additional copies.
+## Files
+- `config.py`
+  - `Settings` reads from environment: `DATABASE_URL`, `OPENAI_API_KEY`, model names, query limits, safety thresholds, and CORS origins.
+  - A single global `settings` is exported for import across the app.
+  - Fails fast if `OPENAI_API_KEY` is missing to prevent runtime surprises.
 
-### database.py
-* Creates an async SQLAlchemy engine (`create_async_engine`) and `async_sessionmaker`.
-* Public helpers:
-  * `get_db()` – FastAPI dependency generator yielding an `AsyncSession`.
-  * `init_db()` – Alembic-friendly helper that issues `Base.metadata.create_all`.
-* Declarative base is exposed as `Base` so models can import it without circularity.
+- `database.py`
+  - Creates async engine (`create_async_engine`) and session factory (`async_sessionmaker`).
+  - Exposes `get_db()` for FastAPI DI and `init_db()` for bootstrapping tables.
+  - Exports `Base` for models.
 
-## Conventions & Guarantees
-1. All DB access is asynchronous.
-2. No global sessions – callers must acquire via DI or explicit context.
-3. Sensitive credentials are injected via env; **never** hard-code in code or markdown.
+## Guarantees
+- All DB IO is async; no global sessions.
+- Secrets only via env; never hard‑code.
+- Defaults enable local dev; production should supply explicit env.
 
-## Potential Improvements
-* Add runtime validation to ensure `DATABASE_URL` includes `asyncpg` driver.
-* Consider splitting `Settings` into smaller pydantic-based config for stronger type-safety and easier overrides during testing.
+## Important env variables
+- `DATABASE_URL=postgresql+asyncpg://…/healthcare_cost_navigator`
+- `OPENAI_API_KEY=sk-…`
+- `OPENAI_MODEL`, `OPENAI_EMBEDDING_MODEL`, `LOG_LEVEL`
+
+## Improvements to consider
+- Validate `DATABASE_URL` includes `asyncpg` and is reachable on startup.
+- Add pydantic‑based settings for stronger typing and env parsing.
