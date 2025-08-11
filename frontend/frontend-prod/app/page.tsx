@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   askAI,
   explain,
@@ -68,7 +68,7 @@ export default function Home() {
           (p.drg_description || "").toLowerCase().includes(t)
         )
       : providers;
-    const sorted = [...base].sort((a: any, b: any) => {
+    const sorted = [...base].sort((a: Provider, b: Provider) => {
       const va = a?.[sortKey];
       const vb = b?.[sortKey];
       if (typeof va === "number" && typeof vb === "number") return sortDir === "asc" ? va - vb : vb - va;

@@ -13,7 +13,10 @@ export function formatRating(rating?: number | string) {
 }
 
 export function friendlyError(error: unknown, context: string) {
-  const message = (error as any)?.message ?? String(error);
+  const maybeObj = error as { message?: string } | null | undefined;
+  const message = maybeObj && typeof maybeObj === "object" && "message" in maybeObj && maybeObj.message
+    ? maybeObj.message
+    : String(error);
   return `Error in ${context}: ${message}`;
 }
 

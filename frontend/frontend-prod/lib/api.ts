@@ -18,7 +18,11 @@ export async function askAI(question: string, useTemplateMatching = true): Promi
   });
 }
 
-export async function explain(question: string, sqlQuery?: string, results?: any): Promise<{ answer: string }> {
+export async function explain(
+  question: string,
+  sqlQuery?: string,
+  results?: AskResponse["results"]
+): Promise<{ answer: string }> {
   const url = `${API_BASE}/explain`;
   return getJson(url, {
     method: "POST",
