@@ -60,6 +60,36 @@ export default function Home() {
   const [stats, setStats] = useState<TemplateStats | null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
 
+  function inferDrgFromContext(q: string, sql?: string, rows?: Array<Record<string, any>> | null): string | undefined {
+    // 1) explicit in SQL
+    if (sql) {
+      const m = sql.match(/drg_code\s*=\s*'?([0-9]{3})'?/i);
+      if (m) return m[1];
+    }
+    // 2) explicit in question
+    const qm = (q || "").match(/\bdrg\s*([0-9]{3})\b/i);
+    if (qm) return qm[1];
+    // 3) present in result rows
+    if (rows && rows.length > 0) {
+      const codes = rows.map((r) => String(r["drg_code"] || "")).filter(Boolean);
+      if (codes.length > 0) return codes[0];
+    }
+    // 4) phrase mapping via quickDRGs names
+    const lowerQ = (q || "").toLowerCase();
+    const map: Record<string, string> = Object.fromEntries(quickDRGs.map((d) => [d.name.toLowerCase(), d.code]));
+    for (const key of Object.keys(map)) {
+      if (lowerQ.includes(key)) return map[key];
+    }
+    // 5) fallback via drg_description in rows
+    if (rows && rows.length > 0) {
+      const desc = String(rows[0]["drg_description"] || "").toLowerCase();
+      for (const key of Object.keys(map)) {
+        if (desc.includes(key)) return map[key];
+      }
+    }
+    return undefined;
+  }
+
   const filteredProviders = useMemo(() => {
     const t = providerFilter.trim().toLowerCase();
     const base = t
@@ -134,9 +164,32 @@ export default function Home() {
                 {aiData ? (
                   <AIResults
                     data={aiData}
-                    onOpenInProviders={({ state, drg_code }) => {
-                      setCriteria((c) => ({ ...c, state: state || "", drg_code: drg_code || c.drg_code }));
+                    onOpenInProviders={async ({ state, drg_code }) => {
+                      const inferredDrg = drg_code || inferDrgFromContext(question, aiData.sql_query, aiData.results);
+                      setCriteria((c) => ({
+                        ...c,
+                        state: state || c.state || "",
+                        drg_code: inferredDrg || c.drg_code || "",
+                      }));
                       setTab("providers");
+                      // Auto-run a provider query when we have enough context
+                      try {
+                        setProviderLoading(true);
+                        const payload = {
+                          state: (state || criteria.state || "") || null,
+                          city: null,
+                          drg_code: (inferredDrg || criteria.drg_code || "") || null,
+                          min_rating: criteria.min_rating ? Number(criteria.min_rating) : null,
+                          max_cost: criteria.max_cost ? Number(criteria.max_cost) : null,
+                          limit: criteria.limit ? Number(criteria.limit) : 10,
+                        };
+                        const data = await providerSearch(payload);
+                        setProviders(data || []);
+                      } catch {
+                        setProviders([]);
+                      } finally {
+                        setProviderLoading(false);
+                      }
                     }}
                   />
                 ) : (
