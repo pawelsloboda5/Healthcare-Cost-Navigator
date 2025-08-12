@@ -9,42 +9,45 @@ on:
       - ".github/workflows/deploy-ec2.yml"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Start ssh-agent with EC2 key
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+      - name: Write private key and trust host
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ec2
+          sed -i 's/\r$//' ~/.ssh/id_ec2
+          chmod 600 ~/.ssh/id_ec2
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts || true
 
-      - name: Trust EC2 host key
-        run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+      - name: SSH smoke test
+        run: ssh -i ~/.ssh/id_ec2 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo connected"
 
-      - name: Sync code to EC2
-        uses: burnett01/rsync-deployments@7.0.1
-        with:
-          switches: -az --delete --exclude=".git/" --exclude="docs/" --exclude="frontend/"
-          path: .
-          remote_path: /home/${{ secrets.EC2_USER }}/Healthcare-Cost-Navigator
-          remote_host: ${{ secrets.EC2_HOST }}
-          remote_user: ${{ secrets.EC2_USER }}
+      - name: Rsync code to EC2
+        run: |
+          rsync -az --delete \
+            --exclude=".git/" --exclude="docs/" --exclude="frontend/" \
+            -e "ssh -i ~/.ssh/id_ec2 -o StrictHostKeyChecking=yes" \
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/Healthcare-Cost-Navigator
 
       - name: Deploy on EC2
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          script: |
-            set -e
-            cd ~/Healthcare-Cost-Navigator/backend
-            if [ ! -f .env.prod ]; then
-              echo ".env.prod missing on EC2; aborting to avoid overwriting"
-              exit 1
-            fi
-            # Ensure postgres uses db.Dockerfile in docker-compose.prod.yml
-            docker-compose --env-file .env.prod -f docker-compose.prod.yml build --no-cache postgres
-            docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
-            docker ps
+        run: |
+          ssh -i ~/.ssh/id_ec2 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} <<'EOF'
+          set -euo pipefail
+          cd ~/Healthcare-Cost-Navigator/backend
+          if [ ! -f .env.prod ]; then
+            echo ".env.prod missing on EC2; aborting to avoid overwriting"
+            exit 1
+          fi
+          docker-compose --env-file .env.prod -f docker-compose.prod.yml build --no-cache postgres
+          docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+          docker ps
+          EOF
