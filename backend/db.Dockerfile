@@ -1,4 +1,4 @@
-# Custom PostgreSQL 16 with PostGIS + pgvector
+# Custom PostgreSQL 17 with PostGIS + pgvector
 FROM postgres:17
 
 RUN apt-get update \
