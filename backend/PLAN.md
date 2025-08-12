@@ -281,7 +281,7 @@ LIMIT  $4;
 7. **Documentation**
    • Update `docs/AI_SQL_Generation.md` with new query type examples.
    • Add entry to API README showcasing the feature.
-
+ 
 ### Affected Files
 | File | Change |
 | --- | --- |
