@@ -88,29 +88,6 @@ class CostAnalysisResponse(BaseModel):
     cost_variance: float
     total_providers: int
 
-# Add CORS middleware
-origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://localhost:3003",
-    "http://localhost:3004",
-    "https://healthcare-cost-navigator.vercel.app",
-    "https://healthcare-cost-navigator.vercel.app/ask",
-    "https://healthcare-cost-navigator.vercel.app/explain",
-    "https://healthcare-cost-navigator.vercel.app/providers",
-    "https://healthcare-cost-navigator.vercel.app/providers/search",
-    "https://healthcare-cost-navigator.vercel.app/providers/cheapest",
-    "https://healthcare-cost-navigator.vercel.app/providers/highest-rated",
-]
-
-router.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Health and status endpoints
 @router.get("/health")
