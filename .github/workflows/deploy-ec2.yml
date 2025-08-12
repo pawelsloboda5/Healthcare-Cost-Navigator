@@ -1,0 +1,53 @@
+name: Deploy to EC2 (docker-compose)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "Caddyfile"
+      - ".github/workflows/deploy-ec2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write private key and trust host
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ec2
+          sed -i 's/\r$//' ~/.ssh/id_ec2
+          chmod 600 ~/.ssh/id_ec2
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts || true
+
+      - name: SSH smoke test
+        run: ssh -i ~/.ssh/id_ec2 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo connected"
+
+      - name: Rsync code to EC2
+        run: |
+          rsync -az --delete \
+            --exclude=".git/" --exclude="docs/" --exclude="frontend/" \
+            -e "ssh -i ~/.ssh/id_ec2 -o StrictHostKeyChecking=yes" \
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/Healthcare-Cost-Navigator
+
+      - name: Deploy on EC2
+        run: |
+          ssh -i ~/.ssh/id_ec2 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} <<'EOF'
+          set -euo pipefail
+          cd ~/Healthcare-Cost-Navigator/backend
+          if [ ! -f .env.prod ]; then
+            echo ".env.prod missing on EC2; aborting to avoid overwriting"
+            exit 1
+          fi
+          docker-compose --env-file .env.prod -f docker-compose.prod.yml build --no-cache postgres
+          docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+          docker ps
+          EOF
