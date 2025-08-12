@@ -4,8 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useMemo, useState } from "react";
+import AIForm from "@/components/AI/AIForm";
+import AIResults from "@/components/AI/AIResults";
 import {
   askAI,
   explain,
@@ -21,6 +22,7 @@ import type { AskResponse, Provider, CostAnalysis, TemplateStats, HealthStatus }
 import { formatCurrency, formatRating, friendlyError } from "@/lib/format";
 
 export default function Home() {
+  const [tab, setTab] = useState("ai");
   const examples = [
     "Who has the cheapest hip replacement in NY?",
     "Most expensive knee replacement between CA and NY?",
@@ -91,7 +93,7 @@ export default function Home() {
         <p className="text-sm text-muted-foreground">NL → SQL • Provider Search • Analytics</p>
       </div>
 
-      <Tabs defaultValue="ai" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="grid grid-cols-4 w-full md:w-auto">
           <TabsTrigger value="ai">AI Assistant</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
@@ -105,103 +107,44 @@ export default function Home() {
               <CardTitle>AI Assistant</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 md:gap-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                {/* Main composer */}
-                <div className="md:col-span-2 grid gap-3">
-                  <Textarea
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    onKeyDown={async (e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        (document.getElementById("btnAskAI") as HTMLButtonElement)?.click();
-                      }
-                    }}
-                    placeholder="Ask about costs, ratings, DRGs… (Press Enter to ask)"
-                    rows={3}
-                  />
-                  <div className="flex gap-2">
-                    <Button id="btnAskAI" disabled={aiLoading} onClick={async () => {
+              <AIForm
+                question={question}
+                onChange={setQuestion}
+                onAsk={async () => {
                   setAiLoading(true);
                   try {
                     const data = await askAI(question, true);
                     setAiData(data);
                     if (data.explanation_pending) {
-                      // fire and forget explanation
-                      explain(question, data.sql_query, data.results).then(exp => setAiData(prev => prev ? { ...prev, answer: exp.answer } : prev)).catch(() => {});
+                      explain(question, data.sql_query, data.results)
+                        .then((exp) => setAiData((prev) => (prev ? { ...prev, answer: exp.answer } : prev)))
+                        .catch(() => {});
                     }
                   } catch (e) {
                     setAiData({ success: false, answer: friendlyError(e, "AI Assistant") } as AskResponse);
                   } finally {
                     setAiLoading(false);
                   }
-                }}>{aiLoading ? "Asking…" : "Ask AI"}</Button>
-                    <Button variant="secondary" onClick={() => { setQuestion(""); setAiData(null); }}>Clear</Button>
-                  </div>
-                  {aiData ? (
-                <div className="space-y-2">
-                  <div className="text-sm"><strong>Answer:</strong> {aiData.answer}</div>
+                }}
+                onClear={() => { setQuestion(""); setAiData(null); }}
+                loading={aiLoading}
+                examples={examples}
+                quickDRGs={quickDRGs}
+              >
+                {aiData ? (
+                  <AIResults
+                    data={aiData}
+                    onOpenInProviders={({ state, drg_code }) => {
+                      setCriteria((c) => ({ ...c, state: state || "", drg_code: drg_code || c.drg_code }));
+                      setTab("providers");
+                    }}
+                  />
+                ) : (
                   <div className="text-xs text-muted-foreground">
-                    {aiData.template_used !== undefined && (
-                      <div>Template: #{aiData.template_used} {aiData.confidence_score !== undefined && `(Confidence: ${(aiData.confidence_score * 100).toFixed(1)}%)`}</div>
-                    )}
-                    {aiData.sql_query && (<div className="mt-1"><strong>SQL:</strong><pre className="mt-1 whitespace-pre-wrap text-[11px] p-2 rounded bg-muted/40 border border-border">{aiData.sql_query}</pre></div>)}
-                    {aiData.execution_time_ms !== undefined && (<div>Execution Time: {aiData.execution_time_ms}ms</div>)}
+                    Tip: Ask comparative questions like “Who has the most expensive procedure CA or NY?” or ratings like “Highest rated hospitals in TX”. Use DRG codes (e.g., 470) or names.
                   </div>
-                  {aiData.results && aiData.results.length > 0 && (
-                    <div className="overflow-x-auto border rounded-md">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            {Object.keys(aiData.results[0]).map((k) => (
-                              <th key={k} className="text-left px-3 py-2 uppercase text-[10px] tracking-wide text-muted-foreground">{k.replaceAll("_"," ")}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {aiData.results.map((r, i) => (
-                            <tr key={i} className="odd:bg-background even:bg-muted/20">
-                              {Object.keys(aiData.results![0]).map((k) => (
-                                <td key={k} className="px-3 py-2 align-top">{String(r[k] ?? "N/A")}</td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">
-                      Tip: Ask comparative questions like “Who has the most expensive procedure CA or NY?” or ratings like “Highest rated hospitals in TX”. Use DRG codes (e.g., 470) or names.
-                    </div>
-                  )}
-                </div>
-
-                {/* Sidebar with examples and DRGs */}
-                <div className="md:col-span-1 grid gap-3">
-                  <div>
-                    <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Examples</div>
-                    <div className="grid gap-2">
-                      {examples.map((ex, i) => (
-                        <Button key={i} variant="outline" className="justify-start h-8 px-2 text-left text-xs" onClick={() => setQuestion(ex)}>
-                          {ex}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-xs font-semibold uppercase text-muted-foreground mb-2">Common DRGs</div>
-                    <div className="flex flex-wrap gap-2">
-                      {quickDRGs.map(({ code, name }) => (
-                        <Button key={code} variant="secondary" className="h-8 px-2 text-xs" onClick={() => setQuestion(`Who has the cheapest ${name.toLowerCase()} in NY? (DRG ${code})`)}>
-                          {code} • {name}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                )}
+              </AIForm>
             </CardContent>
           </Card>
         </TabsContent>
