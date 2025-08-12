@@ -6,11 +6,15 @@ on:
     paths:
       - "backend/**"
       - "Caddyfile"
-      - ".github/workflows/deploy-ec2.yml"
+      - ".github/workflows/**"
   workflow_dispatch:
 
 permissions:
   contents: read
+
+concurrency:
+  group: deploy-ec2
+  cancel-in-progress: true
 
 jobs:
   deploy:
@@ -31,10 +35,11 @@ jobs:
       - name: SSH smoke test
         run: ssh -i ~/.ssh/id_ec2 ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo connected"
 
-      - name: Rsync code to EC2
+      - name: Rsync code to EC2 (preserve server env)
         run: |
           rsync -az --delete \
             --exclude=".git/" --exclude="docs/" --exclude="frontend/" \
+            --exclude="backend/.env.prod" \
             -e "ssh -i ~/.ssh/id_ec2 -o StrictHostKeyChecking=yes" \
             ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USER }}/Healthcare-Cost-Navigator
 
