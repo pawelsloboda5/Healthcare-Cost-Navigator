@@ -1,3 +1,3 @@
-3-88-52-37.sslip.io {
- reverse_proxy http://api:8000
-}
+  34-239-131-85.sslip.io {
+    reverse_proxy http://api:8000
+  }
