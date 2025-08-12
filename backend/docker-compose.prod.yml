@@ -1,0 +1,66 @@
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: db.Dockerfile
+    container_name: healthcare_postgres
+    env_file: .env.prod
+    environment:
+      # conservative on t3.micro
+      POSTGRES_SHARED_BUFFERS: 128MB
+      POSTGRES_WORK_MEM: 4MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 256MB
+      POSTGRES_MAX_PARALLEL_WORKERS_PER_GATHER: 1
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+      POSTGRES_JIT: "off"
+      POSTGRES_RANDOM_PAGE_COST: 1.1
+      POSTGRES_EFFECTIVE_IO_CONCURRENCY: 100
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./etl/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [web]
+    # DO NOT EXPOSE 5432 publicly in prod
+    
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: healthcare_api
+    env_file: .env.prod
+    environment:
+      PYTHONUNBUFFERED: "1"
+      # DATABASE_URL already provided via env_file
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [web]
+
+  caddy:
+    image: caddy:2-alpine
+    env_file: .env.prod
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+    networks: [web]
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  web:
