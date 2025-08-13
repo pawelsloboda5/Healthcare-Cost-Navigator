@@ -32,9 +32,14 @@ export default function AIForm({
   children,
 }: AIFormProps) {
   const detectedStates = useMemo(() => {
-    const matches = (question || "").toUpperCase().match(/\b[A-Z]{2}\b/g) || [];
-    const unique = Array.from(new Set(matches)).filter((s) => STATE_CODES.has(s));
-    return unique.slice(0, 6);
+    const text = question || "";
+    const tokens = Array.from(text.matchAll(/\b([A-Za-z]{2})\b/g)).map((m) => m[1]);
+    const normalized = tokens
+      // Ignore the common word "in" when not typed in uppercase as a state code
+      .filter((raw) => !(raw.toUpperCase() === "IN" && raw !== "IN"))
+      .map((raw) => raw.toUpperCase())
+      .filter((code) => STATE_CODES.has(code));
+    return Array.from(new Set(normalized)).slice(0, 6);
   }, [question]);
 
   const detectedDrgs = useMemo(() => {

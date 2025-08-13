@@ -23,6 +23,7 @@ import {
 import type { AskResponse, Provider, CostAnalysis, TemplateStats, HealthStatus, AIQueryLog } from "@/types/api";
 import { formatCurrency, formatRating, friendlyError } from "@/lib/format";
 import { fetchAIQueryLogs } from "@/lib/api";
+import Image from "next/image";
 
 export default function Home() {
   const [tab, setTab] = useState("ai");
@@ -163,9 +164,12 @@ export default function Home() {
   }
   return (
     <div className="min-h-screen w-full px-5 py-6 md:px-8 lg:px-10">
-      <div className="mb-5">
-        <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Healthcare Cost Navigator</h1>
-        <p className="text-sm text-muted-foreground">NL → SQL • Provider Search • Analytics</p>
+      <div className="mb-5 flex items-center gap-3">
+        <Image src="/better-health.png" alt="Healthcare Cost Navigator" width={40} height={40} priority />
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Healthcare Cost Navigator</h1>
+          <p className="text-sm text-muted-foreground">NL → SQL • Provider Search • Analytics</p>
+        </div>
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
