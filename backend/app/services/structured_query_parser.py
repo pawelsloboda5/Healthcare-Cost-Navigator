@@ -150,6 +150,13 @@ class StructuredQueryParser:
                 if any(kw in text_lower for kw in ["highest rated", "top rated", "best rated"]):
                     params["query_type"] = "highest_rated"
 
+                # Deterministic DRG code extraction as a guardrail for LLM misses
+                if not params.get("drg_code") and isinstance(user_query, str):
+                    import re as _re
+                    m = _re.search(r"\b(?:DRG\s*)?(\d{3})\b", user_query, _re.IGNORECASE)
+                    if m:
+                        params["drg_code"] = m.group(1)
+
                 # Set default limit
                 if not params.get("limit"):
                     params["limit"] = 10

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { AskResponse } from "@/types/api";
 import { Button } from "@/components/ui/button";
 import { Chart } from "@/lib/charts";
+import { formatCurrency, formatRating } from "@/lib/format";
 
 type AIResultsProps = {
   data: AskResponse;
@@ -40,6 +41,31 @@ function inferChartData(rows: NonNullable<AskResponse["results"]>): { labels: st
   });
   if (labels.length < 2) return null;
   return { labels, values };
+}
+
+const currencyLike = /charge|payment|cost|price|amount/i;
+function isNumeric(value: unknown): boolean {
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return false;
+    return Number.isFinite(Number(trimmed));
+  }
+  return false;
+}
+function isRatingKey(key: string): boolean {
+  return /rating/i.test(key);
+}
+function formatCell(key: string, value: unknown): string {
+  if (value === null || value === undefined) return "N/A";
+  if (currencyLike.test(key) && isNumeric(value)) return formatCurrency(value as number | string);
+  if (isRatingKey(key) && isNumeric(value)) return formatRating(value as number | string);
+  if (isNumeric(value)) return Number(value as number | string).toLocaleString("en-US");
+  return String(value);
+}
+function cellAlignClass(key: string, sampleValue: unknown): string {
+  if (currencyLike.test(key) || isRatingKey(key) || isNumeric(sampleValue)) return "text-right";
+  return "text-left";
 }
 
 export default function AIResults({ data, onOpenInProviders }: AIResultsProps) {
@@ -102,7 +128,12 @@ export default function AIResults({ data, onOpenInProviders }: AIResultsProps) {
               <thead className="bg-muted/50">
                 <tr>
                   {Object.keys(data.results[0]).map((k) => (
-                    <th key={k} className="text-left px-3 py-2 uppercase text-[10px] tracking-wide text-muted-foreground">{k.replaceAll("_"," ")}</th>
+                    <th
+                      key={k}
+                      className="px-3 py-2 uppercase text-[10px] tracking-wide text-muted-foreground text-left"
+                    >
+                      {k.replaceAll("_"," ")}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -110,7 +141,13 @@ export default function AIResults({ data, onOpenInProviders }: AIResultsProps) {
                 {data.results.map((r, i) => (
                   <tr key={i} className="odd:bg-background even:bg-muted/20">
                     {Object.keys(data.results![0]).map((k) => (
-                      <td key={k} className="px-3 py-2 align-top">{String(r[k] ?? "N/A")}</td>
+                      <td
+                        key={k}
+                        className={`px-3 py-2 align-top ${cellAlignClass(k, r[k])}`}
+                        title={String(r[k] ?? "N/A")}
+                      >
+                        {formatCell(k, r[k])}
+                      </td>
                     ))}
                   </tr>
                 ))}

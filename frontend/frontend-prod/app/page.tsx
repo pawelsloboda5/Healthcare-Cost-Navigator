@@ -32,13 +32,20 @@ export default function Home() {
     "Who has the highest rated hospital NY or CA?",
     "Find highest rated hospitals for heart surgery",
     "Which hospitals have ratings above 8 in Florida?",
+    "Show top 10 providers by discharges for DRG 470",
+    "Compare average total payments for DRG 191 in TX and CA",
+    "Find cheapest DRG 3 provider in NY",
   ];
   const quickDRGs: Array<{ code: string; name: string }> = [
     { code: "470", name: "Hip Replacement" },
-    { code: "191", name: "Heart Surgery" },
+    { code: "469", name: "Hip Replacement (MCC)" },
     { code: "3", name: "ECMO/Tracheostomy" },
-    { code: "292", name: "Heart Failure & Shock" },
+    { code: "191", name: "Heart Surgery" },
+    { code: "190", name: "Heart Surgery (MCC)" },
     { code: "291", name: "Heart Failure MCC" },
+    { code: "292", name: "Heart Failure & Shock" },
+    { code: "293", name: "Heart Failure w/o MCC" },
+    { code: "470", name: "Major Joint Replacement" },
   ];
   // AI Assistant state
   const [question, setQuestion] = useState("");
@@ -348,15 +355,15 @@ export default function Home() {
                   {Object.keys(providersByState).length > 1 ? "multi-state" : `${filteredProviders.length} results`}
                 </div>
               </div>
-              {Object.keys(providersByState).length > 1 ? (
+                  {Object.keys(providersByState).length > 1 ? (
                 <div className="grid gap-6">
                   {Object.entries(providersByState).map(([st, rows]) => (
-                    <ProviderTable key={st} title={`State: ${st}`} rows={rows} onHeaderClick={onHeaderClick} />
+                    <ProviderTable key={st} title={`State: ${st}`} rows={rows} onHeaderClick={onHeaderClick} sortKey={sortKey} sortDir={sortDir} />
                   ))}
                 </div>
               ) : (
                 filteredProviders.length > 0 ? (
-                  <ProviderTable rows={filteredProviders} onHeaderClick={onHeaderClick} />
+                  <ProviderTable rows={filteredProviders} onHeaderClick={onHeaderClick} sortKey={sortKey} sortDir={sortDir} />
                 ) : (
                   <div className="text-xs text-muted-foreground">No results.</div>
                 )

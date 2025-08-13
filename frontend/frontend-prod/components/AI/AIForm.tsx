@@ -138,7 +138,7 @@ export default function AIForm({
           <div className="flex flex-wrap gap-2">
             {quickDRGs.map(({ code, name }) => (
               <Button
-                key={code}
+                key={`${code}-${name}`}
                 variant="secondary"
                 className="h-8 px-2 text-xs"
                 onClick={() => onChange(`Who has the cheapest ${name.toLowerCase()} in NY? (DRG ${code})`)}

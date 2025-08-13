@@ -53,6 +53,18 @@ class TemplateService:
             # Normalize the SQL query
             normalized_sql, constants = self.normalizer.normalize_sql(sql_query)
             
+            # If the original SQL contains a DRG code literal, append a descriptive alias comment
+            # to strengthen embedding matches (DRG 3-digit codes alone are semantically weak).
+            # This is a non-invasive embedding hint and does not affect execution.
+            try:
+                import re as _re
+                m = _re.search(r"drg_code\s*=\s*'?([0-9]{3,4})'?", sql_query, _re.IGNORECASE)
+                if m:
+                    code = m.group(1)
+                    normalized_sql += f" /* DRG:{code} */"
+            except Exception:
+                pass
+            
             logger.info(f"SQL normalization - Original: {sql_query}")
             logger.info(f"SQL normalization - Normalized: {normalized_sql}")  
             logger.info(f"SQL normalization - Constants extracted: {constants}")

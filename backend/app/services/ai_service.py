@@ -117,6 +117,21 @@ class EnhancedAIService:
                 if multi_state_result.success and multi_state_result.results:
                     return multi_state_result
             
+            # If a 3-digit DRG code is present, enrich the procedure term with the database description
+            # so that template embeddings have a descriptive anchor.
+            if structured_params.drg_code and not structured_params.procedure:
+                try:
+                    from sqlalchemy import text as _text
+                    res = await session.execute(
+                        _text("SELECT drg_description FROM drg_procedures WHERE drg_code = :code"),
+                        {"code": structured_params.drg_code},
+                    )
+                    row = res.fetchone()
+                    if row and row.drg_description:
+                        structured_params.procedure = row.drg_description
+                except Exception as _e:
+                    logger.warning(f"Failed to enrich DRG code {structured_params.drg_code} with description: {_e}")
+
             # Step 2: Try template matching with structured parameters
             if use_template_matching:
                 template_result = await self._try_structured_template_matching(
