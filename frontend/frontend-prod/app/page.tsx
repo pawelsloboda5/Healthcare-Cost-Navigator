@@ -28,14 +28,14 @@ import Image from "next/image";
 export default function Home() {
   const [tab, setTab] = useState("ai");
   const examples = [
-    "Who has the cheapest hip replacement in NY?",
+    "Who has the cheapest hip replacement NY?",
     "Most expensive knee replacement between CA and NY?",
     "Who has the highest rated hospital NY or CA?",
     "Find highest rated hospitals for heart surgery",
-    "Which hospitals have ratings above 8 in Florida?",
+    "Which hospitals have ratings above 8 Florida?",
     "Show top 10 providers by discharges for DRG 470",
-    "Compare average total payments for DRG 191 in TX and CA",
-    "Find cheapest DRG 3 provider in NY",
+    "Compare average total payments for DRG 191 TX and CA",
+    "Find cheapest DRG 3 provider NY",
   ];
   const quickDRGs: Array<{ code: string; name: string }> = [
     { code: "470", name: "Hip Replacement" },
