@@ -1,4 +1,4 @@
-import type { AskResponse, CostAnalysis, Provider, TemplateStats, HealthStatus } from "@/types/api";
+import type { AskResponse, CostAnalysis, Provider, TemplateStats, HealthStatus, AIQueryLog } from "@/types/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000/api/v1";
 
@@ -79,5 +79,13 @@ export async function checkHealth(): Promise<HealthStatus> {
 export async function getTemplateStats(): Promise<TemplateStats> {
   const url = `${API_BASE}/template-stats`;
   return getJson(url);
+}
+
+export async function fetchAIQueryLogs(params: { limit?: number; success?: boolean | null; has_results?: boolean | null } = {}): Promise<AIQueryLog[]> {
+  const u = new URL(`${API_BASE}/dev/ai-logs`);
+  if (params.limit) u.searchParams.set("limit", String(params.limit));
+  if (params.success !== undefined && params.success !== null) u.searchParams.set("success", String(params.success));
+  if (params.has_results !== undefined && params.has_results !== null) u.searchParams.set("has_results", String(params.has_results));
+  return getJson(u.toString());
 }
 

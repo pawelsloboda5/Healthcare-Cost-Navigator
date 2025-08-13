@@ -40,3 +40,19 @@ export type TemplateStats = { template_statistics?: Record<string, number> };
 
 export type HealthStatus = { status: string; service: string };
 
+export type AIQueryLog = {
+  id: number;
+  created_at: string;
+  user_question: string;
+  success: boolean;
+  has_results: boolean;
+  result_count: number;
+  template_used?: number | null;
+  confidence_score?: number | null;
+  execution_time_ms?: number | null;
+  answer?: string | null;
+  sql_query?: string | null;
+  results?: Array<Record<string, any>> | null;
+  error_message?: string | null;
+};
+

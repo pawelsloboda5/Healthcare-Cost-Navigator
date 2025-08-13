@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Numeric, ForeignKey, Index, Text, DateTime
+from sqlalchemy.dialects.postgresql import JSONB, BOOLEAN
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from geoalchemy2 import Geometry
@@ -142,3 +143,33 @@ class TemplateCatalog(Base):
         Index('idx_template_created', 'created_at'),
         # Vector index will be created separately after data load
     ) 
+
+
+class AIQueryLog(Base):
+    """Minimal audit for AI Assistant requests and outcomes."""
+    __tablename__ = "ai_query_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    created_at = Column(DateTime, server_default=func.now())
+
+    # Request
+    user_question = Column(Text, nullable=False)
+
+    # Outcome
+    success = Column(BOOLEAN, nullable=False, default=False)
+    has_results = Column(BOOLEAN, nullable=False, default=False)
+    result_count = Column(Integer, nullable=False, default=0)
+
+    # Response summary
+    answer = Column(Text)
+    sql_query = Column(Text)
+    results = Column(JSONB)
+    template_used = Column(Integer)
+    confidence_score = Column(Numeric(4, 2))  # 0.00..1.00
+    execution_time_ms = Column(Integer)
+    error_message = Column(Text)
+
+    __table_args__ = (
+        Index('idx_ai_logs_created', 'created_at'),
+        Index('idx_ai_logs_success', 'success', 'has_results'),
+    )

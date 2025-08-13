@@ -98,6 +98,23 @@ Transform the basic `/ask` endpoint into a sophisticated Natural Language to SQL
 - [ ] Template usage analytics
 - [ ] Performance monitoring
 
+### Phase 7: Developer Tab – AI Query Logs (Minimal)
+Goal: Persist NL→SQL requests to inspect successes/failures locally and power a public Developer tab in the frontend.
+
+Scope (minimal):
+- New table `ai_query_logs` with: `id SERIAL PK`, `created_at TIMESTAMP DEFAULT NOW()`, `user_question TEXT`, `success BOOLEAN`, `answer TEXT`, `sql_query TEXT`, `results JSONB`, `template_used INT`, `confidence_score NUMERIC(3,2)`, `execution_time_ms INT`, `error_message TEXT`, `result_count INT`, `has_results BOOLEAN`.
+- Insert a row on every `/ask` call (both success and error).
+- Read endpoint `GET /dev/ai-logs?limit=100&success?=&has_results?=` ordered by `created_at DESC`.
+- Local script to (re)create the table using SQLAlchemy models and `init_db()`.
+
+Steps:
+1) Add SQLAlchemy model `AIQueryLog` in `app/models/models.py` and include indices on `(created_at)` and `(success, has_results)`.
+2) In `app/api/routes.py` `/ask`, after computing the result (or on exception), insert a log row via the session.
+3) Add router handler `GET /dev/ai-logs` returning latest entries with simple filters + limit.
+4) Create `backend/scripts/create_ai_query_logs_table.py` to import `init_db()` and ensure the new table exists (idempotent).
+5) Frontend: add a new “Developer” tab that fetches `/dev/ai-logs` and renders a compact table with expand-on-row JSON view; copy buttons for SQL/CSV.
+
+
 ## Technical Architecture
 
 ### Database Schema

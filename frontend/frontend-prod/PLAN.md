@@ -73,4 +73,10 @@
 - AI queries: cheapest, most expensive, multi-state comparisons, highest rated (single/multi-state), cost analysis.
 - Edge cases: empty results, template errors, SQL shown, long provider names, rating formatting.
 
+### Developer Tab (New)
+- Add a fourth tab "Developer" listing latest AI logs from `GET /dev/ai-logs`.
+- Columns: created_at, success, has_results, result_count, template_used, confidence, time(ms), user_question.
+- Row expand: show answer, SQL (copy), and results (JSON pretty, copy CSV).
+- Filters: success (All/Only success/Only failures), has_results (All/Only non-empty/Only empty), limit input.
+
 

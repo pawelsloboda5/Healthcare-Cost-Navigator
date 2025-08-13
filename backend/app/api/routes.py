@@ -10,9 +10,9 @@ import logging
 
 from ..core.database import get_db
 from ..services.ai_service import EnhancedAIService, QueryResult
-from ..services.provider_service import ProviderService, ProviderSearchCriteria, CostAnalysis
+from ..services.provider_service import ProviderService, ProviderSearchCriteria
+from ..models.models import AIQueryLog
 from ..core.config import settings
-from fastapi.middleware.cors import CORSMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +112,35 @@ async def get_template_statistics(db: AsyncSession = Depends(get_db)):
         logger.error(f"Failed to get template statistics: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve template statistics")
 
+# Developer – AI query logs (minimal, public)
+@router.get("/dev/ai-logs")
+async def get_ai_logs(
+    db: AsyncSession = Depends(get_db),
+    limit: int = Query(100, le=500),
+    success: Optional[bool] = Query(None),
+    has_results: Optional[bool] = Query(None),
+):
+    try:
+        conditions = []
+        params = {"limit": limit}
+        base = "SELECT id, created_at, user_question, success, has_results, result_count, template_used, confidence_score, execution_time_ms, answer, sql_query, results, error_message FROM ai_query_logs"
+        if success is not None:
+            conditions.append("success = :success")
+            params["success"] = success
+        if has_results is not None:
+            conditions.append("has_results = :has_results")
+            params["has_results"] = has_results
+        if conditions:
+            base += " WHERE " + " AND ".join(conditions)
+        base += " ORDER BY created_at DESC LIMIT :limit"
+        from sqlalchemy import text as sql_text
+        res = await db.execute(sql_text(base), params)
+        rows = [dict(r._mapping) for r in res]
+        return rows
+    except Exception as e:
+        logger.error(f"Failed to fetch ai logs: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch ai logs")
+
 # Enhanced AI assistant endpoint
 @router.post("/ask", response_model=AskResponse)
 async def ask_ai_assistant(
@@ -144,7 +173,27 @@ async def ask_ai_assistant(
             )
         
         execution_time = int((time.time() - start_time) * 1000)
-        
+
+        # Log the attempt (success path)
+        try:
+            log = AIQueryLog(
+                user_question=request.question,
+                success=bool(result.success),
+                has_results=bool(result.results),
+                result_count=len(result.results or []),
+                answer=explanation if explanation else "",
+                sql_query=result.sql_query,
+                results=result.results or [],
+                template_used=result.template_used,
+                confidence_score=result.confidence_score,
+                execution_time_ms=execution_time,
+                error_message=None,
+            )
+            db.add(log)
+            await db.commit()
+        except Exception as e:
+            logger.warning(f"Failed to write AIQueryLog (success path): {e}")
+
         return AskResponse(
             success=result.success,
             answer=explanation if explanation else "",
@@ -159,7 +208,26 @@ async def ask_ai_assistant(
     except Exception as e:
         logger.error(f"Error in AI assistant: {e}")
         execution_time = int((time.time() - start_time) * 1000)
-        
+        # Log failure
+        try:
+            fail_log = AIQueryLog(
+                user_question=request.question,
+                success=False,
+                has_results=False,
+                result_count=0,
+                answer="",
+                sql_query=None,
+                results=[],
+                template_used=None,
+                confidence_score=None,
+                execution_time_ms=execution_time,
+                error_message=str(e),
+            )
+            db.add(fail_log)
+            await db.commit()
+        except Exception as le:
+            logger.warning(f"Failed to write AIQueryLog (failure path): {le}")
+
         return AskResponse(
             success=False,
             answer="I'm sorry, I encountered an error while processing your question. Please try rephrasing your question.",

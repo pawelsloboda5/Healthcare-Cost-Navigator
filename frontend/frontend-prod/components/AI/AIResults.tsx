@@ -10,7 +10,7 @@ type AIResultsProps = {
   onOpenInProviders?: (params: { state?: string; drg_code?: string }) => void;
 };
 
-function toCsv(rows: Array<Record<string, any>>): string {
+function toCsv(rows: NonNullable<AskResponse["results"]>): string {
   if (!rows || rows.length === 0) return "";
   const headers = Object.keys(rows[0]);
   const escape = (v: unknown) => {
@@ -23,7 +23,7 @@ function toCsv(rows: Array<Record<string, any>>): string {
   return lines.join("\n");
 }
 
-function inferChartData(rows: Array<Record<string, any>>): { labels: string[]; values: number[] } | null {
+function inferChartData(rows: NonNullable<AskResponse["results"]>): { labels: string[]; values: number[] } | null {
   if (!rows || rows.length === 0) return null;
   const sample = rows[0];
   const keys = Object.keys(sample);
