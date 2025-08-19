@@ -25,7 +25,12 @@ export default function ProviderTable({ title, rows, onHeaderClick, sortKey, sor
                   return (
                     <th
                       key={k}
-                      className="px-3 py-2 text-left uppercase text-[10px] tracking-wide text-muted-foreground cursor-pointer select-none"
+                      className={
+                        "px-3 py-2 text-left uppercase text-[10px] tracking-wide text-muted-foreground cursor-pointer select-none " +
+                        (k === "drg_description" ? "hidden md:table-cell " : "") +
+                        (k === "average_covered_charges" ? "hidden sm:table-cell " : "") +
+                        (k === "total_discharges" ? "hidden md:table-cell " : "")
+                      }
                       onClick={() => onHeaderClick?.(k as keyof Provider)}
                       aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
                     >
@@ -45,10 +50,10 @@ export default function ProviderTable({ title, rows, onHeaderClick, sortKey, sor
                   <td className="px-3 py-2">{p.provider_city ?? "N/A"}</td>
                   <td className="px-3 py-2">{p.provider_state ?? "N/A"}</td>
                   <td className="px-3 py-2">{p.drg_code ?? ""}</td>
-                  <td className="px-3 py-2">{p.drg_description ?? ""}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-green-600">{formatCurrency(p.average_covered_charges)}</td>
+                  <td className="px-3 py-2 hidden md:table-cell">{p.drg_description ?? ""}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-green-600 hidden sm:table-cell">{formatCurrency(p.average_covered_charges)}</td>
                   <td className="px-3 py-2 text-right">{formatCurrency(p.average_total_payments)}</td>
-                  <td className="px-3 py-2 text-center">{p.total_discharges ? Number(p.total_discharges).toLocaleString("en-US") : ""}</td>
+                  <td className="px-3 py-2 text-center hidden md:table-cell">{p.total_discharges ? Number(p.total_discharges).toLocaleString("en-US") : ""}</td>
                   <td className="px-3 py-2 text-center font-semibold">{formatRating(p.overall_rating)}</td>
                 </tr>
               ))}

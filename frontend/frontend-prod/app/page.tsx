@@ -164,7 +164,7 @@ export default function Home() {
   }
   return (
     <div className="min-h-screen w-full px-5 py-6 md:px-8 lg:px-10">
-      <div className="mb-5 flex items-center gap-3">
+      <div className="mb-5 flex flex-wrap items-center gap-3">
         <Image src="/better-health.png" alt="Healthcare Cost Navigator" width={40} height={40} priority />
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-foreground">Healthcare Cost Navigator</h1>
@@ -173,7 +173,7 @@ export default function Home() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList className="grid grid-cols-5 w-full md:w-auto">
+        <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="ai">AI Assistant</TabsTrigger>
           <TabsTrigger value="providers">Providers</TabsTrigger>
           <TabsTrigger value="analysis">Cost Analysis</TabsTrigger>
@@ -339,8 +339,8 @@ export default function Home() {
                   try { const rows = await fetchVolumeLeaders(drg, 25); setProviders(rows || []); setProvidersByState({}); } catch { setProviders([]); } finally { setProviderLoading(false); }
                 }}
               />
-              <div className="flex items-center gap-2">
-                <Input placeholder="Filter by provider/city/state..." value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)} />
+              <div className="flex flex-wrap items-center gap-2 gap-y-2">
+                <Input className="flex-1 min-w-0" placeholder="Filter by provider/city/state..." value={providerFilter} onChange={(e) => setProviderFilter(e.target.value)} />
                 <div className="text-xs text-muted-foreground ml-auto flex items-center gap-2">
                   {criteria.min_rating ? (
                     <span
@@ -413,7 +413,7 @@ export default function Home() {
               <CardTitle>System Status</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button variant="outline" disabled={statusLoading} onClick={async () => {
                   setStatusLoading(true);
                   try { const h = await checkHealth(); setHealth(h); }

@@ -37,7 +37,7 @@ class DRGLookupService:
         self, 
         session: AsyncSession, 
         phrase: str, 
-        similarity_threshold: float = 0.3  # Lowered from 0.7 to 0.5 for better medical term matching
+        similarity_threshold: float = 0.3  # Lowered from 0.7 to 0.3 for better medical term matching
     ) -> Optional[str]:
         """
         Find DRG code using vector-based semantic search
@@ -99,7 +99,7 @@ class DRGLookupService:
         session: AsyncSession, 
         phrase: str
     ) -> Optional[str]:
-        """Fallback to trigram similarity search if vector search fails"""
+        """Fallback to trigram similarity search (Postgres pg_trgm extension)if vector search fails"""
         try:
             fallback_query = text("""
                 SELECT drg_code

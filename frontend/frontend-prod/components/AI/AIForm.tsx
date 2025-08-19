@@ -103,7 +103,7 @@ export default function AIForm({
             ))}
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button id="btnAskAI" disabled={!!loading} onClick={onAsk}>
             {loading ? "Asking…" : "Ask AI"}
           </Button>

@@ -113,7 +113,7 @@ export default function AIResults({ data, onOpenInProviders }: AIResultsProps) {
             <strong className="text-xs">SQL</strong>
             <Button variant="ghost" size="sm" onClick={() => copy(data.sql_query!)}>Copy SQL</Button>
           </div>
-          <pre className="mt-1 whitespace-pre-wrap text-[11px] p-2 rounded bg-muted/40 border border-border">{data.sql_query}</pre>
+          <pre className="mt-1 whitespace-pre-wrap text-[11px] p-2 rounded bg-muted/40 border border-border overflow-x-auto">{data.sql_query}</pre>
         </div>
       )}
 

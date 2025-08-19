@@ -25,7 +25,7 @@ provider_service = ProviderService()
 
 # Pydantic models
 class ProviderResponse(BaseModel):
-    provider_id: str
+    provider_id: str 
     provider_name: str
     provider_city: str
     provider_state: str
