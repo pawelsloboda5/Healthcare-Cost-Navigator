@@ -78,6 +78,17 @@ class ExplainRequest(BaseModel):
 class ExplainResponse(BaseModel):
     answer: str
 
+class QueryRequest(BaseModel):
+    question: str = Field(..., min_length=3, description="Natural language healthcare question")
+    limit: Optional[int] = Field(None, le=100, description="Override result limit")
+
+class QueryResponse(BaseModel):
+    success: bool
+    data: Optional[List[dict]] = None
+    sql: Optional[str] = None
+    count: int = 0
+    message: str = ""
+
 class CostAnalysisResponse(BaseModel):
     drg_code: str
     drg_description: Optional[str] = None
@@ -251,6 +262,37 @@ async def explain_query(
     except Exception as e:
         logger.error(f"Explain endpoint failed: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate explanation")
+
+@router.post("/query", response_model=QueryResponse)
+async def query_public_hospital_data(request: QueryRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Convert NL to SQL, execute, return data. For external AI chatbots.
+    No authentication required - public hospital data.
+    """
+    try:
+        result: QueryResult = await ai_service.process_natural_language_query(
+            session=db,
+            user_query=request.question,
+            use_template_matching=True
+        )
+        
+        if result.success and result.results:
+            data = result.results[:request.limit] if request.limit else result.results
+            return QueryResponse(
+                success=True,
+                data=data,
+                sql=result.sql_query,
+                count=len(data),
+                message="Query executed successfully"
+            )
+        else:
+            return QueryResponse(
+                success=False,
+                message=result.message or "Query failed"
+            )
+    except Exception as e:
+        logger.error(f"Query endpoint error: {e}")
+        return QueryResponse(success=False, message=str(e))
 
 # Provider search endpoints
 @router.post("/providers/search", response_model=List[ProviderResponse])

@@ -23,7 +23,12 @@ class Settings:
     API_VERSION: str = "1.0.0"
     
     # CORS settings
-    ALLOWED_ORIGINS: list = ["*"]  # In production, specify actual domains
+    ALLOWED_ORIGINS: list = [
+        "http://localhost:3001",
+        "https://www.sie2.com",
+        "https://healthcare-cost-navigator.vercel.app/",
+        "http://localhost:8000",  # For API docs
+    ]
     
     # Query settings
     DEFAULT_QUERY_LIMIT: int = 20
