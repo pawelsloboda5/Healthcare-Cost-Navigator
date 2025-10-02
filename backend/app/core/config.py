@@ -26,7 +26,7 @@ class Settings:
     ALLOWED_ORIGINS: list = [
         "http://localhost:3001",
         "https://www.sie2.com",
-        "https://healthcare-cost-navigator.vercel.app/",
+        "https://healthcare-cost-navigator.vercel.app",
         "http://localhost:8000",  # For API docs
     ]
     
