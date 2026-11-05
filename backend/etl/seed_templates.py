@@ -31,7 +31,7 @@ print(f"OPENAI_API_KEY: {'SET' if openai_api_key else 'NOT SET'}")
 if not database_url:
     print("ERROR: DATABASE_URL environment variable is not set!")
     print("Please create a .env file in the backend directory with:")
-    print("DATABASE_URL=postgresql+asyncpg://postgres:Warmia50587@localhost:5432/healthcare_cost_navigator")
+    print("DATABASE_URL=postgresql+asyncpg://postgres:<your-password>@localhost:5432/healthcare_cost_navigator")
     sys.exit(1)
 
 if not openai_api_key:

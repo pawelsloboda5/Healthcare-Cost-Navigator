@@ -23,6 +23,16 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.models.models import Base
 target_metadata = Base.metadata
 
+# Keep credentials out of alembic.ini: use DATABASE_URL when it is set.
+# Alembic runs synchronously, so drop the asyncpg driver suffix.
+# "%" is doubled because Alembic's config uses configparser interpolation.
+_database_url = os.getenv("DATABASE_URL")
+if _database_url:
+    config.set_main_option(
+        "sqlalchemy.url",
+        _database_url.replace("+asyncpg", "").replace("%", "%%"),
+    )
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")

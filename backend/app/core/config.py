@@ -9,7 +9,7 @@ class Settings:
     # Database settings
     DATABASE_URL: str = os.getenv(
         "DATABASE_URL", 
-        "postgresql+asyncpg://postgres:Warmia50587@localhost:5432/healthcare_cost_navigator"
+        "postgresql+asyncpg://postgres:postgres@localhost:5432/healthcare_cost_navigator"
     )
     
     # OpenAI settings
