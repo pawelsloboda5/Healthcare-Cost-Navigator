@@ -6,7 +6,7 @@ services:
     container_name: healthcare_postgres
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Warmia50587
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}
       POSTGRES_DB: healthcare_cost_navigator
       # Performance tuning settings - AGGRESSIVE 32GB WORKSTATION
       POSTGRES_SHARED_BUFFERS: 2GB
@@ -35,7 +35,7 @@ services:
     env_file:
       - .env           
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:Warmia50587@postgres:5432/healthcare_cost_navigator
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}@postgres:5432/healthcare_cost_navigator
     ports:
       - "8000:8000"
     depends_on:

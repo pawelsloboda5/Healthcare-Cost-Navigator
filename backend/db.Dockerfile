@@ -12,4 +12,3 @@ RUN chmod +x /docker-entrypoint-initdb.d/99-configure-postgres.sh
 
 ENV POSTGRES_DB=healthcare_cost_navigator
 ENV POSTGRES_USER=postgres
-ENV POSTGRES_PASSWORD=Warmia50587 
